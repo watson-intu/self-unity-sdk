@@ -20,6 +20,9 @@ using IBM.Watson.DeveloperCloud.Utilities;
 using WebSocketSharp;
 using System.Collections.Generic;
 using IBM.Watson.DeveloperCloud.Logging;
+using MiniJSON;
+using System.Text;
+using System.Collections;
 
 namespace IBM.Watson.Self
 {
@@ -31,6 +34,7 @@ namespace IBM.Watson.Self
             Inactive,
             Connecting,
             Connected,
+            Disconnecting,
             Disconnected
         };
         public struct SubInfo
@@ -73,13 +77,20 @@ namespace IBM.Watson.Self
         public delegate void OnQuery(QueryInfo a_Info);
         public delegate void OnConnected( TopicClient a_Client );
         public delegate void OnDisconnected( TopicClient a_Client );
+        public delegate void MessageHandler( IDictionary a_Message );
         #endregion
 
         #region Private Data
-        string m_Host = null;
-        string m_GroupId = null;
-        WebSocket m_Socket = null;
-        ClientState m_eState = ClientState.Inactive;
+        Uri             m_Host = null;
+        string          m_GroupId = null;
+        WebSocket       m_Socket = null;
+        ClientState     m_eState = ClientState.Inactive;
+        List<object>    m_SendQueue = new List<object>();
+        uint            m_ReqId = 1;
+        Dictionary<uint,OnQuery> 
+                        m_QueryRequestMap = new Dictionary<uint, OnQuery>();
+        Dictionary<string,MessageHandler>
+                        m_MessageHandlers = new Dictionary<string, MessageHandler>();
         #endregion
 
         #region Public Interface
@@ -87,19 +98,23 @@ namespace IBM.Watson.Self
 
         public ClientState State { get { return m_eState; } }
 
-        void Connect( string a_Host,
+        bool Connect( string a_Host,
             string a_GroupId,
             OnConnected a_OnConnected = null,
             OnDisconnected a_OnDisconnected = null )
         {
-            if ( m_Socket != null )
-                throw new WatsonException( "Connect has already been called." );
+            if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
+                && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
+            {
+                Log.Error( "TopicClient", "Host doesn't begin with ws:// or wss://" );
+                return false;
+            }
 
+            m_Host = new Uri( a_Host );
             m_eState = ClientState.Connecting;
-            m_Host = a_Host;
             m_GroupId = a_GroupId;
 
-            m_Socket = new WebSocket(a_Host);
+            m_Socket = new WebSocket( new Uri( m_Host, "/stream").AbsoluteUri );
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("groupId", a_GroupId );
             m_Socket.Headers.Add("selfId", Utility.MacAddress );
@@ -110,10 +125,16 @@ namespace IBM.Watson.Self
             m_Socket.OnClose += OnSocketClosed;
 
             m_Socket.ConnectAsync();
+            return true;
         }
 
         void Disconnect()
         {
+            if ( m_Socket != null )
+            {
+                m_eState = ClientState.Disconnecting;
+                m_Socket.CloseAsync();
+            }
         }
 
         //! Publish data for a remote target specified by the provided path.
@@ -130,6 +151,19 @@ namespace IBM.Watson.Self
         void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
             OnQuery a_Callback)
         {
+            if ( m_Socket == null )
+                throw new WatsonException( "Query called before calling Connect." );
+
+            uint reqId = m_ReqId++;
+            m_QueryRequestMap[ reqId ] = a_Callback;
+
+            Dictionary<string, object> query = new Dictionary<string, object>();
+            query["targets"] = new string[] { a_Path };
+            query["origin"] = ".";
+            query["msg"] = "query";
+            query["request"] = reqId;
+
+            SendMessage( query );
         }
 
         //! Subscribe to the given topic specified by the provided path.
@@ -153,9 +187,30 @@ namespace IBM.Watson.Self
         #endregion
 
         #region WebSocket Callbacks
-        public void OnSocketMessage(object sender, MessageEventArgs messageEventArgs)
+        public void OnSocketMessage(object sender, MessageEventArgs message)
         {
-           // SelfMessage response = Utility.DeserializeResponse<SelfMessage>(messageEventArgs.RawData, null);
+            IDictionary json = null;
+            if ( message.IsBinary )
+            {
+                // the first part up to the first /0 character will be the json..
+                byte [] data = message.RawData;
+
+                int headerSize = 0;
+                while( data[headerSize] != 0 )
+                    headerSize += 1;
+
+                byte [] headerData = new byte[ headerSize - 1 ];
+                Buffer.BlockCopy( data, 0, headerData, 0, headerSize - 1 );
+                byte [] payload = new byte[ data.Length - headerSize ];
+                Buffer.BlockCopy( data, headerSize + 1, payload, 0, payload.Length );
+
+                json = Json.Deserialize( Encoding.UTF8.GetString(headerData) ) as IDictionary;
+                json["data"] = payload;
+            }
+            else if ( message.IsText )
+                json = Json.Deserialize( message.Data ) as IDictionary;
+
+
 
         }
 
@@ -163,6 +218,16 @@ namespace IBM.Watson.Self
         {
             Log.Status("TopicClient", "Connected to {0}", m_Host );
             m_eState = ClientState.Connected;
+
+            for(int i=0;i<m_SendQueue.Count;++i)
+            {
+                object send = m_SendQueue[i];
+                if ( send is byte[] )
+                    m_Socket.Send( send as byte[] );
+                else if ( send is string )
+                    m_Socket.Send( send as string );
+            }
+            m_SendQueue.Clear();
         }
 
         public void OnSocketError(object sender, WebSocketSharp.ErrorEventArgs e)
@@ -173,6 +238,37 @@ namespace IBM.Watson.Self
         {
             Log.Status("TopicClient", "Socket closed." );
             m_eState = ClientState.Disconnected;
+            m_Socket = null;
+        }
+        #endregion
+
+        #region Private Functions
+        void SendMessage( Dictionary<string,object> a_json )
+        {
+            if ( a_json.ContainsKey( "binary" ) && ((bool)a_json["binary"]) != false )
+            {
+                byte [] data = a_json["data"] as byte [];
+                a_json["data"] = data.Length;
+
+                byte [] header = Encoding.UTF8.GetBytes( Json.Serialize( a_json ) );
+                byte [] frame = new byte [ header.Length + data.Length + 1 ];
+
+                Buffer.BlockCopy( header, 0, frame, 0, header.Length );
+                Buffer.BlockCopy( data, 0, frame, header.Length + 1, data.Length );
+
+                if ( m_eState == ClientState.Connected )
+                    m_Socket.Send(frame);
+                else
+                    m_SendQueue.Add(frame);
+            }
+            else
+            {
+                string send = Json.Serialize( a_json );
+                if ( m_eState == ClientState.Connected )
+                    m_Socket.Send( send );
+                else
+                    m_SendQueue.Add( send );
+            }
         }
         #endregion
     }
