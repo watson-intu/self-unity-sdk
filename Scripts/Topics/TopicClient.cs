@@ -16,13 +16,13 @@
 */
 
 using System;
-using IBM.Watson.DeveloperCloud.Utilities;
-using WebSocketSharp;
-using System.Collections.Generic;
-using IBM.Watson.DeveloperCloud.Logging;
-using MiniJSON;
 using System.Text;
 using System.Collections;
+using System.Collections.Generic;
+using IBM.Watson.DeveloperCloud.Logging;
+using IBM.Watson.DeveloperCloud.Utilities;
+using MiniJSON;
+using WebSocketSharp;
 
 namespace IBM.Watson.Self
 {
@@ -80,6 +80,22 @@ namespace IBM.Watson.Self
         public delegate void MessageHandler( IDictionary a_Message );
         #endregion
 
+        #region Private Types
+        private class Subscription
+        {
+            public Subscription()
+            { }
+            public Subscription( string a_Path, OnPayload a_Callback )
+            {
+                m_Path = a_Path;
+                m_Callback = a_Callback;
+            }
+
+            public string m_Path;
+            public OnPayload m_Callback;
+        };
+        #endregion
+
         #region Private Data
         Uri             m_Host = null;
         string          m_GroupId = null;
@@ -91,6 +107,8 @@ namespace IBM.Watson.Self
                         m_QueryRequestMap = new Dictionary<uint, OnQueryResponse>();
         Dictionary<string,MessageHandler>
                         m_MessageHandlers = new Dictionary<string, MessageHandler>();
+        Dictionary<string, List<Subscription> >
+                        m_SubscriptionMap = new Dictionary<string, List<Subscription>>();
         #endregion
 
         #region Public Interface
@@ -147,13 +165,43 @@ namespace IBM.Watson.Self
         }
 
         //! Publish data for a remote target specified by the provided path.
-        bool Publish(
+        void Publish(
             string a_Path,
             string a_Data,
-            bool a_bPersisted = false,
-            bool a_bBinary = false)
+            bool a_bPersisted = false)
         {
-            return true;
+            if ( m_Socket == null )
+                throw new WatsonException( "Query called before calling Connect." );
+
+            Dictionary<string,object> publish = new Dictionary<string, object>();
+            publish["targets"] = new string[] { a_Path };
+            publish["origin"] = ".";
+            publish["msg"] = "publish_at";
+            publish["data"] = a_Data;
+            publish["binary"] = false;
+            publish["persisted"] = a_bPersisted;
+
+            SendMessage( publish );
+        }
+
+        //! Publish binary data to the remote target by the specified path.
+        void Publish(
+            string a_Path,
+            byte [] a_Data,
+            bool a_bPersisted = false )
+        {
+            if ( m_Socket == null )
+                throw new WatsonException( "Query called before calling Connect." );
+
+            Dictionary<string,object> publish = new Dictionary<string, object>();
+            publish["targets"] = new string[] { a_Path };
+            publish["origin"] = ".";
+            publish["msg"] = "publish_at";
+            publish["data"] = a_Data;
+            publish["binary"] = true;
+            publish["persisted"] = a_bPersisted;
+
+            SendMessage( publish );
         }
 
         //! This queries a node specified by the given path.
@@ -179,19 +227,67 @@ namespace IBM.Watson.Self
         void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
         {
+            if ( m_Socket == null )
+                throw new WatsonException( "Query called before calling Connect." );
+
+            if ( m_SubscriptionMap.ContainsKey( a_Path ) )
+                m_SubscriptionMap[ a_Path ] = new List<Subscription>();
+            m_SubscriptionMap[ a_Path ].Add( new Subscription( a_Path, a_Callback ) );
+
+            Dictionary<string,object> sub = new Dictionary<string, object>();
+            sub["targets"] = new string[] { a_Path };
+            sub["origin"] = ".";
+            sub["msg"] = "subscribe";
+
+            SendMessage( sub );
         }
 
         //! Unsubscribe from the given topic
         bool Unsubscribe( string a_Path,
-            object a_pObject = null)
+            OnPayload a_Callback = null)
         {
-            return true;
+            List<Subscription> subs = null;
+            if (! m_SubscriptionMap.TryGetValue( a_Path, out subs ) )
+                return false;
+
+            bool bSuccess = false;
+            for(int i=0;i<subs.Count;)
+            {
+                if ( a_Callback == null || subs[i].m_Callback == a_Callback )
+                {
+                    subs.RemoveAt( i );
+                    bSuccess = true;
+                }
+                else
+                    i += 1;
+            }
+
+            if ( subs.Count == 0 )
+            {
+                m_SubscriptionMap.Remove( a_Path );
+
+                Dictionary<string,object> unsub = new Dictionary<string, object>();
+                unsub["targets"] = new string[] { a_Path };
+                unsub["origin"] = ".";
+                unsub["msg"] = "unsubscribe";
+
+                SendMessage( unsub );
+            }
+
+            return bSuccess;
         }
 
         //! Helper function for appending a topic onto a origin
         public static string GetPath(string a_Origin, string a_Topic)
         {
-            return "";
+	        string sPath;
+	        int nLastDot = a_Origin.LastIndexOf( "/." );
+	        if (nLastDot > 0 )
+		        sPath = a_Origin.Substring( 0, nLastDot ) + a_Topic;
+	        else
+		        sPath = a_Topic;
+
+	        return sPath;
         }
         #endregion
 
