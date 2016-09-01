@@ -101,6 +101,7 @@ namespace IBM.Watson.Self.Topics
         Uri             m_Host = null;
         string          m_GroupId = null;
         string          m_SelfId = null;
+        string          m_ParentId = null;
         WebSocket       m_Socket = null;
         OnConnected     m_OnConnected = null;
         OnDisconnected  m_OnDisconnected = null;
@@ -332,6 +333,7 @@ namespace IBM.Watson.Self.Topics
 
                     Log.Status("TopicClient", "Received authenicate control, groupId: {0}, selfId: {1}", groupId, selfId);
                     // TODO actually authenticate the other end?
+                    m_ParentId = selfId;
                 }
 
             }
@@ -441,16 +443,41 @@ namespace IBM.Watson.Self.Topics
         }
         void HandleSubFailed(IDictionary a_Message)
         {
-            Log.Debug( "TopicClient", "HandleSubFailed()" );   
+            string path = OriginToPath( (string)a_Message["origin"] );
+            Log.Debug( "TopicClient", "HandleSubFailed() - {0}", path );
+
+            List<Subscription> subs = null;
+            if ( m_SubscriptionMap.TryGetValue( path, out subs ) )
+            {
+                for(int i=0;i<subs.Count;++i)
+                    subs[i].m_Callback( null );
+
+                m_SubscriptionMap.Remove( path );
+            }
         }
 
         void HandleNoRoute(IDictionary a_Message)
         {
-            Log.Debug( "TopicClient", "HandleNoRoute()" );   
+            string origin = (string)a_Message["origin"];
+            Log.Warning( "TopicClient", "Failed to send message to {0}", origin );
         }
         void HandleQuery(IDictionary a_Message)
         {
             Log.Debug( "TopicClient", "HandleQuery()" );   
+
+            Dictionary<string,object> resp = new Dictionary<string, object>();
+            resp["targets"] = new string[] { OriginToPath( (string)a_Message["origin"] ) };
+            resp["origin"] = m_SelfId + "/.";
+            resp["msg"] = "query_response";
+            resp["request"] = (string)a_Message["request"];
+            resp["selfId"] = m_SelfId;
+            resp["groupId"] = m_GroupId;
+            resp["name"] = "TopicClient";
+            resp["type"] = "Unity";
+            resp["version"] = Config.Instance.GetVariableValue( "version" );
+            resp["parentId"] = m_ParentId;
+
+            SendMessage( resp );
         }
 
         //! We are a client, not a manager, so all our origin's should come through our connection which we consider our parent

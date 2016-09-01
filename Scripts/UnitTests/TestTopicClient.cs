@@ -28,6 +28,7 @@ namespace IBM.Watson.Self.UnitTests
     public class TestTopicClient : UnitTest
     {
         bool m_bQueryTested = false;
+        bool m_bSubFailedTested = false;
         bool m_bSubscribeBinaryTested = false;
         bool m_bSubscribeTextTested = false;
 
@@ -41,6 +42,8 @@ namespace IBM.Watson.Self.UnitTests
             while(! m_bSubscribeBinaryTested )
                 yield return null;
             while(! m_bSubscribeTextTested )
+                yield return null;
+            while(! m_bSubFailedTested )
                 yield return null;
 
             yield break;
@@ -72,6 +75,7 @@ namespace IBM.Watson.Self.UnitTests
             m_bSubscribeBinaryTested = true;
 
             TopicClient.Instance.Subscribe( "blackboard", OnBlackboard );
+            TopicClient.Instance.Subscribe( "invalid-topic", OnInvalidTopic );
             TopicClient.Instance.Publish( "conversation", "tell me a joke" );
         }
 
@@ -80,6 +84,13 @@ namespace IBM.Watson.Self.UnitTests
             Log.Debug( "TopicClient", "OnBlackboard() - {0}", Encoding.UTF8.GetString( a_Payload.Data ) );
             Test( TopicClient.Instance.Unsubscribe( "blackboard", OnBlackboard ) );
             m_bSubscribeTextTested = true;
+        }
+
+        private void OnInvalidTopic( TopicClient.Payload a_Payload )
+        {
+            Log.Debug( "TopicClient", "OnInvalidTopic() " );
+            Test( a_Payload == null );
+            m_bSubFailedTested = true;
         }
     }
 }
