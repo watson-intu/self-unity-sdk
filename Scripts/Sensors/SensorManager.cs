@@ -17,8 +17,10 @@
 
 using System.Collections;
 using IBM.Watson.DeveloperCloud.Utilities;
+using IBM.Watson.Self.Topics;
+using System.Collections.Generic;
 
-namespace IBM.Watson.Self
+namespace IBM.Watson.Self.Sensors
 {
     //! This sensor manager allows the user to register/unregister sensors with the remote
     //! self instance through the TopicClient.
@@ -27,8 +29,31 @@ namespace IBM.Watson.Self
         #region Public Interface
         static SensorManager Instance { get { return Singleton<SensorManager>.Instance; } }
 
+        public SensorManager()
+        {
+            TopicClient.Instance.Subscribe( "sensor-manager", OnSensorManagerEvent );
+        }
+
+        //! Register a sensor with the remote self instance, agents may now subscribe to this 
+        //! sensor and OnStart() will be invoked automatically by this framework.
+        public void RegisterSensor( ISensor a_Sensor )
+        {
+            Dictionary<string,object> register = new Dictionary<string, object>();
+            register["event"] = "register_sensor";
+            register["data_type"] = a_Sensor.GetSensorDataType().Name;
+            register["name"] = a_Sensor.GetSensorName();
+        }
+
+        //! Unregister the provided sensor object.
+        public void UnregisterSensor( ISensor a_Sensor )
+        {
+        }
 
         #endregion
+
+        void OnSensorManagerEvent( TopicClient.Payload a_Payload )
+        {
+        }
     }
 
 }

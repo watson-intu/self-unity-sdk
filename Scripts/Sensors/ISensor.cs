@@ -25,6 +25,7 @@ namespace IBM.Watson.Self
     public abstract class ISensor
     {
         #region ISensor interface
+        public abstract string GetSensorName();
         public abstract Type GetSensorDataType();
         public abstract string GetBinaryType();
         public abstract bool OnStart();
