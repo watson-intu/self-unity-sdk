@@ -119,6 +119,9 @@ namespace IBM.Watson.Self.Topics
                         m_MessageHandlers = new Dictionary<string, MessageHandler>();
         Dictionary<string, List<Subscription> >
                         m_SubscriptionMap = new Dictionary<string, List<Subscription>>();
+
+        int             m_PublishRoutine = -1;
+        List<Payload>   m_PublishList = new List<Payload>();
         #endregion
 
         #region Public Interface
@@ -169,7 +172,8 @@ namespace IBM.Watson.Self.Topics
 
             if ( m_ReconnectRoutine < 0 )
                 m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
-
+            if ( m_PublishRoutine < 0 )
+                m_PublishRoutine = Runnable.Run( OnPublish() );
             return true;
         }
 
@@ -179,6 +183,11 @@ namespace IBM.Watson.Self.Topics
             {
                 Runnable.Stop( m_ReconnectRoutine );
                 m_ReconnectRoutine = -1;
+            }
+            if ( m_PublishRoutine >= 0 )
+            {
+                Runnable.Stop( m_PublishRoutine );
+                m_PublishRoutine = -1;
             }
 
             if ( m_Socket != null )
@@ -409,6 +418,8 @@ namespace IBM.Watson.Self.Topics
 
         IEnumerator OnReconnect()
         {
+            yield return null;
+
             while( m_Socket != null )
             {
                 if ( m_eState == ClientState.Disconnected )
@@ -423,6 +434,39 @@ namespace IBM.Watson.Self.Topics
                 }
                 else
                     yield return null;
+            }
+        }
+        IEnumerator OnPublish()
+        {
+            yield return null;
+
+            while( m_Socket != null )
+            {
+                lock(m_PublishList)
+                {
+                    if ( m_PublishList.Count > 0 )
+                    {
+                        for(int i=0;i<m_PublishList.Count;++i)
+                        {
+                            Payload payload = m_PublishList[i];
+
+                            List<Subscription> subs = null;
+                            if ( m_SubscriptionMap.TryGetValue( payload.Origin, out subs ) )
+                            {
+                                for(int j=0;j<subs.Count;++j)
+                                    subs[j].m_Callback( payload );
+                            }
+                            else
+                            {
+                                Log.Debug( "TopicClient", "Automatically unsubscribing from topic {0}", payload.Origin );
+                                Unsubscribe( payload.Origin );
+                            }
+                        }
+                        m_PublishList.Clear();
+                    }
+                }
+
+                yield return null;
             }
         }
 
@@ -464,29 +508,20 @@ namespace IBM.Watson.Self.Topics
             Log.Debug( "TopicClient", "HandlePublish()" );   
 
             string path = OriginToPath( GetPath( (string)a_Message["origin"], (string)a_Message["topic"] ) );
-            List<Subscription> subs = null;
-            if ( m_SubscriptionMap.TryGetValue( path, out subs ) )
-            {
-                Payload payload = new Payload();
-                payload.Origin = path;
-                payload.Topic = (string)a_Message["topic"];
-                if ( a_Message.Contains( "remote_origin" ) )
-                    payload.RemoteOrigin = (string)a_Message["remote_origin"];
+            Payload payload = new Payload();
+            payload.Origin = path;
+            payload.Topic = (string)a_Message["topic"];
+            if ( a_Message.Contains( "remote_origin" ) )
+                payload.RemoteOrigin = (string)a_Message["remote_origin"];
 
-                if ( a_Message["data"] is string )
-                    payload.Data = Encoding.UTF8.GetBytes( (string)a_Message["data"] );
-                else
-                    payload.Data = (byte [])a_Message["data"];
-                payload.Type = (string)a_Message["type"];
-
-                for(int i=0;i<subs.Count;++i)
-                    subs[i].m_Callback( payload );
-            }
+            if ( a_Message["data"] is string )
+                payload.Data = Encoding.UTF8.GetBytes( (string)a_Message["data"] );
             else
-            {
-                Log.Debug( "TopicClient", "Automatically unsubscribing from topic {0}", path );
-                Unsubscribe( path );
-            }
+                payload.Data = (byte [])a_Message["data"];
+            payload.Type = (string)a_Message["type"];
+
+            lock(m_PublishList)
+                m_PublishList.Add( payload );
         }
         void HandleSubFailed(IDictionary a_Message)
         {
