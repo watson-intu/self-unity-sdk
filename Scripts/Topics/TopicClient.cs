@@ -24,7 +24,7 @@ using IBM.Watson.DeveloperCloud.Utilities;
 using MiniJSON;
 using WebSocketSharp;
 
-namespace IBM.Watson.Self
+namespace IBM.Watson.Self.Topics
 {
 
     public class TopicClient
@@ -39,44 +39,45 @@ namespace IBM.Watson.Self
         };
         public struct SubInfo
         {
-            public bool m_Subscribed;       // true if subscribing, false if un-subscribing
-            public string m_Origin;         // who is the subscriber
-            public string m_Topic;          // topic they are subscribing too
+            public bool Subscribed { get; set; }       // true if subscribing, false if un-subscribing
+            public string Origin { get; set; }         // who is the subscriber
+            public string Topic { get; set; }          // topic they are subscribing too
         };
         public delegate void OnSubscriber(SubInfo a_Info);
 
-        public struct Payload
+        public class Payload
         {
-            string m_Topic;     // the topic of this payload
-            string m_Origin;        // who sent this payload
-            byte [] m_Data;          // the payload data
-            string m_Type;          // the type of data
-            bool m_Persisted;   // true if this was a persisted payload
-            string m_RemoteOrigin;  // this is set to the origin that published this payload 
+            public string Topic { get; set; }     // the topic of this payload
+            public string Origin { get; set; }        // who sent this payload
+            public byte [] Data { get; set; }          // the payload data
+            public string Type { get; set; }          // the type of data
+            public bool Persisted { get; set; }   // true if this was a persisted payload
+            public string RemoteOrigin { get; set; }  // this is set to the origin that published this payload 
         };
         public delegate void OnPayload(Payload a_Payload);
 
-        public struct TopicInfo
+        public class TopicInfo
         {
-            string m_TopicId;       // the ID of this topic
-            string m_Type;          // type of topic
+            public string TopicId { get; set; }       // the ID of this topic
+            public string Type { get; set; }          // type of topic
         };
 
-        public struct QueryInfo
+        public class QueryInfo
         {
-            bool m_bSuccess;
-            string m_Path;
-            string m_GroupId;
-            string m_SelfId;
-            string m_ParentId;
-            string m_Name;
-            string m_Type;
-            string[] m_Children;
-            TopicInfo[] m_Topics;
+            public bool bSuccess { get; set; }
+            public string Path { get; set; }
+            public string GroupId { get; set; }
+            public string SelfId { get; set; }
+            public string ParentId { get; set; }
+            public string Name { get; set; }
+            public string Type { get; set; }
+            public string Version { get; set; }
+            public string[] Children { get; set; }
+            public TopicInfo[] Topics { get; set; }
         };
         public delegate void OnQueryResponse(QueryInfo a_Info);
-        public delegate void OnConnected( TopicClient a_Client );
-        public delegate void OnDisconnected( TopicClient a_Client );
+        public delegate void OnConnected();
+        public delegate void OnDisconnected();
         public delegate void MessageHandler( IDictionary a_Message );
         #endregion
 
@@ -99,12 +100,15 @@ namespace IBM.Watson.Self
         #region Private Data
         Uri             m_Host = null;
         string          m_GroupId = null;
+        string          m_SelfId = null;
         WebSocket       m_Socket = null;
+        OnConnected     m_OnConnected = null;
+        OnDisconnected  m_OnDisconnected = null;
         ClientState     m_eState = ClientState.Inactive;
         List<object>    m_SendQueue = new List<object>();
-        uint            m_ReqId = 1;
-        Dictionary<uint,OnQueryResponse> 
-                        m_QueryRequestMap = new Dictionary<uint, OnQueryResponse>();
+        int             m_ReqId = 1;
+        Dictionary<int,OnQueryResponse> 
+                        m_QueryRequestMap = new Dictionary<int, OnQueryResponse>();
         Dictionary<string,MessageHandler>
                         m_MessageHandlers = new Dictionary<string, MessageHandler>();
         Dictionary<string, List<Subscription> >
@@ -116,7 +120,7 @@ namespace IBM.Watson.Self
 
         public ClientState State { get { return m_eState; } }
 
-        TopicClient()
+        public TopicClient()
         {
             m_MessageHandlers["publish"] = HandlePublish;
             m_MessageHandlers["subscribe_failed"] = HandleSubFailed;
@@ -125,7 +129,7 @@ namespace IBM.Watson.Self
             m_MessageHandlers["query_response"] = HandleQueryResponse;
         }
 
-        bool Connect( string a_Host,
+        public bool Connect( string a_Host,
             string a_GroupId,
             OnConnected a_OnConnected = null,
             OnDisconnected a_OnDisconnected = null )
@@ -140,11 +144,14 @@ namespace IBM.Watson.Self
             m_Host = new Uri( a_Host );
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
+            m_SelfId = Utility.MacAddress;
+            m_OnConnected = a_OnConnected;
+            m_OnDisconnected = a_OnDisconnected;
 
             m_Socket = new WebSocket( new Uri( m_Host, "/stream").AbsoluteUri );
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("groupId", a_GroupId );
-            m_Socket.Headers.Add("selfId", Utility.MacAddress );
+            m_Socket.Headers.Add("selfId", m_SelfId );
 
             m_Socket.OnMessage += OnSocketMessage;
             m_Socket.OnOpen += OnSocketOpen;
@@ -155,7 +162,7 @@ namespace IBM.Watson.Self
             return true;
         }
 
-        void Disconnect()
+        public void Disconnect()
         {
             if ( m_Socket != null )
             {
@@ -165,7 +172,7 @@ namespace IBM.Watson.Self
         }
 
         //! Publish data for a remote target specified by the provided path.
-        void Publish(
+        public void Publish(
             string a_Path,
             string a_Data,
             bool a_bPersisted = false)
@@ -175,7 +182,7 @@ namespace IBM.Watson.Self
 
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = ".";
+            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = false;
@@ -185,7 +192,7 @@ namespace IBM.Watson.Self
         }
 
         //! Publish binary data to the remote target by the specified path.
-        void Publish(
+        public void Publish(
             string a_Path,
             byte [] a_Data,
             bool a_bPersisted = false )
@@ -195,7 +202,7 @@ namespace IBM.Watson.Self
 
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = ".";
+            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = true;
@@ -205,18 +212,18 @@ namespace IBM.Watson.Self
         }
 
         //! This queries a node specified by the given path.
-        void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
+        public void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
             OnQueryResponse a_Callback)
         {
             if ( m_Socket == null )
                 throw new WatsonException( "Query called before calling Connect." );
 
-            uint reqId = m_ReqId++;
+            int reqId = m_ReqId++;
             m_QueryRequestMap[ reqId ] = a_Callback;
 
             Dictionary<string, object> query = new Dictionary<string, object>();
             query["targets"] = new string[] { a_Path };
-            query["origin"] = ".";
+            query["origin"] = m_SelfId + "/.";
             query["msg"] = "query";
             query["request"] = reqId;
 
@@ -224,7 +231,7 @@ namespace IBM.Watson.Self
         }
 
         //! Subscribe to the given topic specified by the provided path.
-        void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
+        public void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
         {
             if ( m_Socket == null )
@@ -236,14 +243,14 @@ namespace IBM.Watson.Self
 
             Dictionary<string,object> sub = new Dictionary<string, object>();
             sub["targets"] = new string[] { a_Path };
-            sub["origin"] = ".";
+            sub["origin"] = m_SelfId + "/.";
             sub["msg"] = "subscribe";
 
             SendMessage( sub );
         }
 
         //! Unsubscribe from the given topic
-        bool Unsubscribe( string a_Path,
+        public bool Unsubscribe( string a_Path,
             OnPayload a_Callback = null)
         {
             List<Subscription> subs = null;
@@ -268,7 +275,7 @@ namespace IBM.Watson.Self
 
                 Dictionary<string,object> unsub = new Dictionary<string, object>();
                 unsub["targets"] = new string[] { a_Path };
-                unsub["origin"] = ".";
+                unsub["origin"] = m_SelfId + "/.";
                 unsub["msg"] = "unsubscribe";
 
                 SendMessage( unsub );
@@ -292,7 +299,7 @@ namespace IBM.Watson.Self
         #endregion
 
         #region WebSocket Callbacks
-        public void OnSocketMessage(object sender, MessageEventArgs message)
+        void OnSocketMessage(object sender, MessageEventArgs message)
         {
             IDictionary json = null;
             if ( message.IsBinary )
@@ -342,10 +349,13 @@ namespace IBM.Watson.Self
                 Log.Error("TopicClient", "Unknown message type received: {0}", Json.Serialize(json));
         }
 
-        public void OnSocketOpen(object sender, EventArgs e)
+        void OnSocketOpen(object sender, EventArgs e)
         {
             Log.Status("TopicClient", "Connected to {0}", m_Host );
             m_eState = ClientState.Connected;
+
+            if ( m_OnConnected != null )
+                m_OnConnected();
 
             for(int i=0;i<m_SendQueue.Count;++i)
             {
@@ -358,14 +368,18 @@ namespace IBM.Watson.Self
             m_SendQueue.Clear();
         }
 
-        public void OnSocketError(object sender, WebSocketSharp.ErrorEventArgs e)
+        void OnSocketError(object sender, WebSocketSharp.ErrorEventArgs e)
         {
-            Log.Error( "TopicClient", "WebSocket error: {0}", e.ToString() );
+            Log.Error( "TopicClient", "WebSocket error: {0}", e.Message );
         }
-        public void OnSocketClosed(object sender, CloseEventArgs e)
+        void OnSocketClosed(object sender, CloseEventArgs e)
         {
             Log.Status("TopicClient", "Socket closed." );
             m_eState = ClientState.Disconnected;
+
+            if ( m_OnDisconnected != null )
+                m_OnDisconnected();
+
             m_Socket = null;
         }
         #endregion
@@ -403,22 +417,66 @@ namespace IBM.Watson.Self
         #region Message Handlers
         void HandlePublish(IDictionary a_Message)
         {
-            
+            Log.Debug( "TopicClient", "HandlePublish()" );   
         }
         void HandleSubFailed(IDictionary a_Message)
         {
+            Log.Debug( "TopicClient", "HandleSubFailed()" );   
         }
 
         void HandleNoRoute(IDictionary a_Message)
         {
-
+            Log.Debug( "TopicClient", "HandleNoRoute()" );   
         }
         void HandleQuery(IDictionary a_Message)
         {
+            Log.Debug( "TopicClient", "HandleQuery()" );   
         }
 
         void HandleQueryResponse(IDictionary a_Message)
         {
+            Log.Debug( "TopicClient", "HandleQueryResponse()" );   
+
+            QueryInfo info = new QueryInfo();
+            info.Path = (string)a_Message["origin"];
+            info.SelfId = (string)a_Message["selfId"];
+            info.GroupId = (string)a_Message["groupId"];
+            if ( a_Message.Contains( "name" ) )
+            {
+                info.Name = (string)a_Message["name"];
+                info.Type = (string)a_Message["type"];
+                info.Version = (string)a_Message["version"];
+            }
+            if ( a_Message.Contains( "parentId" ) )
+                info.ParentId = (string)a_Message["parentId"];
+
+            if ( a_Message.Contains( "children" ) )
+            {
+                IList children = (IList)a_Message["children"];
+                info.Children = new string[ children.Count ];
+                for(int i=0;i<children.Count;++i)
+                    info.Children[i] = (string)children[i];
+            }
+
+            if ( a_Message.Contains( "topics" ) )
+            {
+                IList topics = (IList)a_Message["topics"];
+                info.Topics = new TopicInfo[ topics.Count ];
+                for(int i=0;i<topics.Count;++i)
+                {
+                    IDictionary topic = (IDictionary)topics[i];
+
+                    TopicInfo ti = new TopicInfo();
+                    ti.TopicId = (string)topic["topicId"];
+                    ti.Type = (string)topic["type"];
+                    info.Topics[i] = ti;
+                }
+            }
+
+            int reqId = int.Parse( (string)a_Message["request"] ); 
+            OnQueryResponse callback = null;
+            if ( m_QueryRequestMap.TryGetValue( reqId, out callback ) )
+                callback( info );
         }
         #endregion
     }
