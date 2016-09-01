@@ -21,12 +21,15 @@ using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.DeveloperCloud.UnitTests;
 using IBM.Watson.Self.Topics;
 using IBM.Watson.DeveloperCloud.Logging;
+using System.Text;
 
 namespace IBM.Watson.Self.UnitTests
 {
     public class TestTopicClient : UnitTest
     {
         bool m_bQueryTested = false;
+        bool m_bSubscribeBinaryTested = false;
+        bool m_bSubscribeTextTested = false;
 
         public override IEnumerator RunTest()
         {
@@ -34,6 +37,10 @@ namespace IBM.Watson.Self.UnitTests
 
             client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", OnConnected, OnDisconnected );
             while(! m_bQueryTested )
+                yield return null;
+            while(! m_bSubscribeBinaryTested )
+                yield return null;
+            while(! m_bSubscribeTextTested )
                 yield return null;
 
             yield break;
@@ -52,7 +59,27 @@ namespace IBM.Watson.Self.UnitTests
 
         private void OnQuery( TopicClient.QueryInfo a_Query )
         {
+            Log.Debug( "TopicClient", "OnQuery()" );
             m_bQueryTested = true;
+
+            TopicClient.Instance.Subscribe( "sensor-Microphone", OnMicrophoneData );
+        }
+
+        private void OnMicrophoneData( TopicClient.Payload a_Payload )
+        {
+            Log.Debug( "TopicClient", "OnMicrophoneData() - received {0} bytes", a_Payload.Data.Length );
+            Test( TopicClient.Instance.Unsubscribe( "sensor-Microphone", OnMicrophoneData ) );
+            m_bSubscribeBinaryTested = true;
+
+            TopicClient.Instance.Subscribe( "blackboard", OnBlackboard );
+            TopicClient.Instance.Publish( "conversation", "tell me a joke" );
+        }
+
+        private void OnBlackboard( TopicClient.Payload a_Payload )
+        {
+            Log.Debug( "TopicClient", "OnBlackboard() - {0}", Encoding.UTF8.GetString( a_Payload.Data ) );
+            Test( TopicClient.Instance.Unsubscribe( "blackboard", OnBlackboard ) );
+            m_bSubscribeTextTested = true;
         }
     }
 }

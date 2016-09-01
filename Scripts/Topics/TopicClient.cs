@@ -237,7 +237,7 @@ namespace IBM.Watson.Self.Topics
             if ( m_Socket == null )
                 throw new WatsonException( "Query called before calling Connect." );
 
-            if ( m_SubscriptionMap.ContainsKey( a_Path ) )
+            if (! m_SubscriptionMap.ContainsKey( a_Path ) )
                 m_SubscriptionMap[ a_Path ] = new List<Subscription>();
             m_SubscriptionMap[ a_Path ].Add( new Subscription( a_Path, a_Callback ) );
 
@@ -290,7 +290,7 @@ namespace IBM.Watson.Self.Topics
 	        string sPath;
 	        int nLastDot = a_Origin.LastIndexOf( "/." );
 	        if (nLastDot > 0 )
-		        sPath = a_Origin.Substring( 0, nLastDot ) + a_Topic;
+		        sPath = a_Origin.Substring( 0, nLastDot + 1 ) + a_Topic;
 	        else
 		        sPath = a_Topic;
 
@@ -313,7 +313,7 @@ namespace IBM.Watson.Self.Topics
 
                 byte [] headerData = new byte[ headerSize - 1 ];
                 Buffer.BlockCopy( data, 0, headerData, 0, headerSize - 1 );
-                byte [] payload = new byte[ data.Length - headerSize ];
+                byte [] payload = new byte[ data.Length - headerSize - 1 ];
                 Buffer.BlockCopy( data, headerSize + 1, payload, 0, payload.Length );
 
                 json = Json.Deserialize( Encoding.UTF8.GetString(headerData) ) as IDictionary;
@@ -418,6 +418,26 @@ namespace IBM.Watson.Self.Topics
         void HandlePublish(IDictionary a_Message)
         {
             Log.Debug( "TopicClient", "HandlePublish()" );   
+
+            string path = OriginToPath( GetPath( (string)a_Message["origin"], (string)a_Message["topic"] ) );
+            List<Subscription> subs = null;
+            if ( m_SubscriptionMap.TryGetValue( path, out subs ) )
+            {
+                Payload payload = new Payload();
+                payload.Origin = path;
+                payload.Topic = (string)a_Message["topic"];
+                if ( a_Message.Contains( "remote_origin" ) )
+                    payload.RemoteOrigin = (string)a_Message["remote_origin"];
+
+                if ( a_Message["data"] is string )
+                    payload.Data = Encoding.UTF8.GetBytes( (string)a_Message["data"] );
+                else
+                    payload.Data = (byte [])a_Message["data"];
+                payload.Type = (string)a_Message["type"];
+
+                for(int i=0;i<subs.Count;++i)
+                    subs[i].m_Callback( payload );
+            }
         }
         void HandleSubFailed(IDictionary a_Message)
         {
@@ -433,12 +453,23 @@ namespace IBM.Watson.Self.Topics
             Log.Debug( "TopicClient", "HandleQuery()" );   
         }
 
+        //! We are a client, not a manager, so all our origin's should come through our connection which we consider our parent
+        string OriginToPath( string a_Origin )
+        {
+            if ( a_Origin.StartsWith( "../" ) )
+                return a_Origin.Substring( 3 );     // remove the ../ from the origin...
+
+            Log.Warning( "TopicClient", "Unexpected origin {0}", a_Origin );
+            return a_Origin;
+        }
+
         void HandleQueryResponse(IDictionary a_Message)
         {
             Log.Debug( "TopicClient", "HandleQueryResponse()" );   
 
             QueryInfo info = new QueryInfo();
-            info.Path = (string)a_Message["origin"];
+            info.bSuccess = true;
+            info.Path = OriginToPath( (string)a_Message["origin"] );
             info.SelfId = (string)a_Message["selfId"];
             info.GroupId = (string)a_Message["groupId"];
             if ( a_Message.Contains( "name" ) )
