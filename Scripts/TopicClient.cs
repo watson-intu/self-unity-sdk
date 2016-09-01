@@ -74,7 +74,7 @@ namespace IBM.Watson.Self
             string[] m_Children;
             TopicInfo[] m_Topics;
         };
-        public delegate void OnQuery(QueryInfo a_Info);
+        public delegate void OnQueryResponse(QueryInfo a_Info);
         public delegate void OnConnected( TopicClient a_Client );
         public delegate void OnDisconnected( TopicClient a_Client );
         public delegate void MessageHandler( IDictionary a_Message );
@@ -87,8 +87,8 @@ namespace IBM.Watson.Self
         ClientState     m_eState = ClientState.Inactive;
         List<object>    m_SendQueue = new List<object>();
         uint            m_ReqId = 1;
-        Dictionary<uint,OnQuery> 
-                        m_QueryRequestMap = new Dictionary<uint, OnQuery>();
+        Dictionary<uint,OnQueryResponse> 
+                        m_QueryRequestMap = new Dictionary<uint, OnQueryResponse>();
         Dictionary<string,MessageHandler>
                         m_MessageHandlers = new Dictionary<string, MessageHandler>();
         #endregion
@@ -97,6 +97,15 @@ namespace IBM.Watson.Self
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
 
         public ClientState State { get { return m_eState; } }
+
+        TopicClient()
+        {
+            m_MessageHandlers["publish"] = HandlePublish;
+            m_MessageHandlers["subscribe_failed"] = HandleSubFailed;
+            m_MessageHandlers["no_route"] = HandleNoRoute;
+            m_MessageHandlers["query"] = HandleQuery;
+            m_MessageHandlers["query_response"] = HandleQueryResponse;
+        }
 
         bool Connect( string a_Host,
             string a_GroupId,
@@ -149,7 +158,7 @@ namespace IBM.Watson.Self
 
         //! This queries a node specified by the given path.
         void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
-            OnQuery a_Callback)
+            OnQueryResponse a_Callback)
         {
             if ( m_Socket == null )
                 throw new WatsonException( "Query called before calling Connect." );
@@ -210,8 +219,31 @@ namespace IBM.Watson.Self
             else if ( message.IsText )
                 json = Json.Deserialize( message.Data ) as IDictionary;
 
+            if (json.Contains("control"))
+            {
+                string control = json["control"] as string;
+                if (control == "authenticate")
+                {
+                    string groupId = json["groupId"] as string;
+                    string selfId = json["selfId"] as string;
 
+                    Log.Status("TopicClient", "Received authenicate control, groupId: {0}, selfId: {1}", groupId, selfId);
+                    // TODO actually authenticate the other end?
+                }
 
+            }
+            else if (json.Contains("msg"))
+            {
+                string msg = json["msg"] as string;
+
+                MessageHandler handler = null;
+                if (m_MessageHandlers.TryGetValue(msg, out handler))
+                    handler(json);
+                else
+                    Log.Debug("TopicClient", "Received unhandled message {0}", msg);
+            }
+            else
+                Log.Error("TopicClient", "Unknown message type received: {0}", Json.Serialize(json));
         }
 
         public void OnSocketOpen(object sender, EventArgs e)
@@ -269,6 +301,28 @@ namespace IBM.Watson.Self
                 else
                     m_SendQueue.Add( send );
             }
+        }
+        #endregion
+
+        #region Message Handlers
+        void HandlePublish(IDictionary a_Message)
+        {
+            
+        }
+        void HandleSubFailed(IDictionary a_Message)
+        {
+        }
+
+        void HandleNoRoute(IDictionary a_Message)
+        {
+
+        }
+        void HandleQuery(IDictionary a_Message)
+        {
+        }
+
+        void HandleQueryResponse(IDictionary a_Message)
+        {
         }
         #endregion
     }
