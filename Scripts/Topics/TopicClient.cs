@@ -34,7 +34,7 @@ namespace IBM.Watson.Self.Topics
             Inactive,
             Connecting,
             Connected,
-            Disconnecting,
+            Closing,
             Disconnected
         };
         public struct SubInfo
@@ -97,8 +97,13 @@ namespace IBM.Watson.Self.Topics
         };
         #endregion
 
+        #region Constants
+        const float     RECONNECT_INTERVAL = 5.0F;
+        #endregion
+
         #region Private Data
-        Uri             m_Host = null;
+        int             m_ReconnectRoutine = -1;
+        string          m_Host = null;
         string          m_GroupId = null;
         string          m_SelfId = null;
         string          m_ParentId = null;
@@ -118,8 +123,9 @@ namespace IBM.Watson.Self.Topics
 
         #region Public Interface
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
-
         public ClientState State { get { return m_eState; } }
+        public string GroupId { get { return m_GroupId; } }
+        public string SelfId { get { return m_SelfId; } }
 
         public TopicClient()
         {
@@ -142,14 +148,14 @@ namespace IBM.Watson.Self.Topics
                 return false;
             }
 
-            m_Host = new Uri( a_Host );
+            m_Host = a_Host;
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = Utility.MacAddress;
             m_OnConnected = a_OnConnected;
             m_OnDisconnected = a_OnDisconnected;
 
-            m_Socket = new WebSocket( new Uri( m_Host, "/stream").AbsoluteUri );
+            m_Socket = new WebSocket( new Uri( new Uri( m_Host ), "/stream").AbsoluteUri );
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("groupId", a_GroupId );
             m_Socket.Headers.Add("selfId", m_SelfId );
@@ -160,14 +166,24 @@ namespace IBM.Watson.Self.Topics
             m_Socket.OnClose += OnSocketClosed;
 
             m_Socket.ConnectAsync();
+
+            if ( m_ReconnectRoutine < 0 )
+                m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
+
             return true;
         }
 
         public void Disconnect()
         {
+            if ( m_ReconnectRoutine >= 0 )
+            {
+                Runnable.Stop( m_ReconnectRoutine );
+                m_ReconnectRoutine = -1;
+            }
+
             if ( m_Socket != null )
             {
-                m_eState = ClientState.Disconnecting;
+                m_eState = ClientState.Closing;
                 m_Socket.CloseAsync();
             }
         }
@@ -254,23 +270,24 @@ namespace IBM.Watson.Self.Topics
         public bool Unsubscribe( string a_Path,
             OnPayload a_Callback = null)
         {
-            List<Subscription> subs = null;
-            if (! m_SubscriptionMap.TryGetValue( a_Path, out subs ) )
-                return false;
-
             bool bSuccess = false;
-            for(int i=0;i<subs.Count;)
+
+            List<Subscription> subs = null;
+            if ( m_SubscriptionMap.TryGetValue( a_Path, out subs ) )
             {
-                if ( a_Callback == null || subs[i].m_Callback == a_Callback )
+                for(int i=0;i<subs.Count;)
                 {
-                    subs.RemoveAt( i );
-                    bSuccess = true;
+                    if ( a_Callback == null || subs[i].m_Callback == a_Callback )
+                    {
+                        subs.RemoveAt( i );
+                        bSuccess = true;
+                    }
+                    else
+                        i += 1;
                 }
-                else
-                    i += 1;
             }
 
-            if ( subs.Count == 0 )
+            if ( subs == null || subs.Count == 0 )
             {
                 m_SubscriptionMap.Remove( a_Path );
 
@@ -376,14 +393,39 @@ namespace IBM.Watson.Self.Topics
         }
         void OnSocketClosed(object sender, CloseEventArgs e)
         {
-            Log.Status("TopicClient", "Socket closed." );
-            m_eState = ClientState.Disconnected;
+            Log.Status("TopicClient", "OnSocketClosed()" );
 
+            if ( m_eState != ClientState.Closing )
+                m_eState = ClientState.Disconnected;
             if ( m_OnDisconnected != null )
                 m_OnDisconnected();
 
-            m_Socket = null;
+            if ( m_eState == ClientState.Closing )
+            {
+                m_eState = ClientState.Inactive;
+                m_Socket = null;
+            }
         }
+
+        IEnumerator OnReconnect()
+        {
+            while( m_Socket != null )
+            {
+                if ( m_eState == ClientState.Disconnected )
+                {
+                    Log.Status( "TopicClient", "Reconnecting in {0} seconds.", RECONNECT_INTERVAL );
+
+                    DateTime start = DateTime.Now;
+                    while( (DateTime.Now - start).TotalSeconds < RECONNECT_INTERVAL )
+                        yield return null;
+
+                    Connect( m_Host, m_GroupId, m_OnConnected, m_OnDisconnected );
+                }
+                else
+                    yield return null;
+            }
+        }
+
         #endregion
 
         #region Private Functions
@@ -439,6 +481,11 @@ namespace IBM.Watson.Self.Topics
 
                 for(int i=0;i<subs.Count;++i)
                     subs[i].m_Callback( payload );
+            }
+            else
+            {
+                Log.Debug( "TopicClient", "Automatically unsubscribing from topic {0}", path );
+                Unsubscribe( path );
             }
         }
         void HandleSubFailed(IDictionary a_Message)
