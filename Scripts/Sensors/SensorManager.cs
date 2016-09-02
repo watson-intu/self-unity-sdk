@@ -39,8 +39,8 @@ namespace IBM.Watson.Self.Sensors
         public void RegisterSensor( ISensor a_Sensor )
         {
             Dictionary<string,object> register = new Dictionary<string, object>();
-            register["event"] = "register_sensor";
-            register["data_type"] = a_Sensor.GetSensorDataType().Name;
+            register["event"] = "add_sensor_proxy";
+            register["data_type"] = a_Sensor.GetSensorDataType();
             register["name"] = a_Sensor.GetSensorName();
         }
 
