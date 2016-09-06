@@ -44,42 +44,50 @@ namespace IBM.Watson.Self.Sensors
 
         public bool IsRegistered( ISensor a_Sensor )
         {
-            return m_Sensors.ContainsKey( a_Sensor.SensorId );
+            return m_Sensors.ContainsKey( a_Sensor.GetSensorId() );
         }
 
         //! Register a sensor with the remote self instance, agents may now subscribe to this 
         //! sensor and OnStart() will be invoked automatically by this framework.
         public void RegisterSensor( ISensor a_Sensor )
         {
-            if (! m_Sensors.ContainsKey( a_Sensor.SensorId ) )
+            if (! m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
                 Dictionary<string,object> register = new Dictionary<string, object>();
                 register["event"] = "add_sensor_proxy";
-                register["sensorId"] = a_Sensor.SensorId;
+                register["sensorId"] = a_Sensor.GetSensorId();
                 register["name"] = a_Sensor.GetSensorName();
                 register["data_type"] = a_Sensor.GetDataType();
                 register["binary_type"] = a_Sensor.GetBinaryType();
 
                 TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
-                m_Sensors[ a_Sensor.SensorId ] = a_Sensor;
+                m_Sensors[ a_Sensor.GetSensorId() ] = a_Sensor;
 
-                Log.Status( "SensorManager", "Sensor {0} added.", a_Sensor.SensorId );
+                Log.Status( "SensorManager", "Sensor {0} added.", a_Sensor.GetSensorId() );
             }
+        }
+
+        public void SendData( ISensor a_pSensor, ISensorData a_Data )
+        {
+            if (! SensorManager.Instance.IsRegistered( a_pSensor ) )
+                throw new WatsonException( "SendData() invoked on unregisted sensors." );
+
+            TopicClient.Instance.Publish( "sensor-proxy-" + a_pSensor.GetSensorId(), a_Data.ToBinary() );
         }
 
         //! Unregister the provided sensor object.
         public void UnregisterSensor( ISensor a_Sensor )
         {
-            if ( m_Sensors.ContainsKey( a_Sensor.SensorId ) )
+            if ( m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
-                m_Sensors.Remove( a_Sensor.SensorId );
+                m_Sensors.Remove( a_Sensor.GetSensorId() );
 
                 Dictionary<string,object> register = new Dictionary<string, object>();
                 register["event"] = "remove_sensor_proxy";
-                register["sensorId"] = a_Sensor.SensorId;
+                register["sensorId"] = a_Sensor.GetSensorId();
 
                 TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
-                Log.Status( "SensorManager", "Sensor {0} removed.", a_Sensor.SensorId );
+                Log.Status( "SensorManager", "Sensor {0} removed.", a_Sensor.GetSensorId() );
             }
         }
 
@@ -96,7 +104,7 @@ namespace IBM.Watson.Self.Sensors
             if ( m_Sensors.TryGetValue( sensorId, out sensor ) )
             {
                 string event_name = json["event"] as string;
-                if (event_name.CompareTo("start_Sensor") == 0)
+                if (event_name.CompareTo("start_sensor") == 0)
                 {
                     if (!sensor.OnStart())
                     {
@@ -116,11 +124,6 @@ namespace IBM.Watson.Self.Sensors
                     sensor.OnPause();
                 else if (event_name.CompareTo("resume_sensor") == 0)
                     sensor.OnResume();
-                else
-                {
-                    Log.Warning( "SensorManager", "Unknown event {0}", event_name );
-                    bFailed = true;
-                }
             }
             else
             {

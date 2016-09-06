@@ -37,13 +37,10 @@ namespace IBM.Watson.Self.Sensors
         public abstract void OnPause();
         public abstract void OnResume();
         #endregion
-
-        #region Public Properties
-        public string SensorId { get { return m_SensorId; } }
-        #endregion
-
-        #region Internal Interface
-        protected void SendData( IData a_Data )
+    
+        #region Public Functions
+        public string GetSensorId() { return m_SensorId; }
+        public void SendData( ISensorData a_Data )
         {
             if (! SensorManager.Instance.IsRegistered( this ) )
                 throw new WatsonException( "SendData() invoked on unregisted sensors." );
