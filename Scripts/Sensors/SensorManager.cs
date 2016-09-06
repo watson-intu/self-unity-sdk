@@ -15,10 +15,14 @@
 *
 */
 
-using System.Collections;
 using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.Self.Topics;
+using IBM.Watson.DeveloperCloud.Logging;
+
+using System.Collections;
+using System.Text;
 using System.Collections.Generic;
+using MiniJSON;
 
 namespace IBM.Watson.Self.Sensors
 {
@@ -26,33 +30,113 @@ namespace IBM.Watson.Self.Sensors
     //! self instance through the TopicClient.
     public class SensorManager
     {
+        #region Private Data
+        Dictionary<string, ISensor >    m_Sensors = new Dictionary<string, ISensor>();
+        #endregion
+
         #region Public Interface
-        static SensorManager Instance { get { return Singleton<SensorManager>.Instance; } }
+        public static SensorManager Instance { get { return Singleton<SensorManager>.Instance; } }
 
         public SensorManager()
         {
             TopicClient.Instance.Subscribe( "sensor-manager", OnSensorManagerEvent );
         }
 
+        public bool IsRegistered( ISensor a_Sensor )
+        {
+            return m_Sensors.ContainsKey( a_Sensor.SensorId );
+        }
+
         //! Register a sensor with the remote self instance, agents may now subscribe to this 
         //! sensor and OnStart() will be invoked automatically by this framework.
         public void RegisterSensor( ISensor a_Sensor )
         {
-            Dictionary<string,object> register = new Dictionary<string, object>();
-            register["event"] = "add_sensor_proxy";
-            register["data_type"] = a_Sensor.GetSensorDataType();
-            register["name"] = a_Sensor.GetSensorName();
+            if (! m_Sensors.ContainsKey( a_Sensor.SensorId ) )
+            {
+                Dictionary<string,object> register = new Dictionary<string, object>();
+                register["event"] = "add_sensor_proxy";
+                register["sensorId"] = a_Sensor.SensorId;
+                register["name"] = a_Sensor.GetSensorName();
+                register["data_type"] = a_Sensor.GetDataType();
+                register["binary_type"] = a_Sensor.GetBinaryType();
+
+                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
+                m_Sensors[ a_Sensor.SensorId ] = a_Sensor;
+
+                Log.Status( "SensorManager", "Sensor {0} added.", a_Sensor.SensorId );
+            }
         }
 
         //! Unregister the provided sensor object.
         public void UnregisterSensor( ISensor a_Sensor )
         {
+            if ( m_Sensors.ContainsKey( a_Sensor.SensorId ) )
+            {
+                m_Sensors.Remove( a_Sensor.SensorId );
+
+                Dictionary<string,object> register = new Dictionary<string, object>();
+                register["event"] = "remove_sensor_proxy";
+                register["sensorId"] = a_Sensor.SensorId;
+
+                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
+                Log.Status( "SensorManager", "Sensor {0} removed.", a_Sensor.SensorId );
+            }
         }
 
         #endregion
 
         void OnSensorManagerEvent( TopicClient.Payload a_Payload )
         {
+            IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( a_Payload.Data ) ) as IDictionary;
+
+            bool bFailed = false;
+            string sensorId = json["sensorId"] as string;
+
+            ISensor sensor = null;
+            if ( m_Sensors.TryGetValue( sensorId, out sensor ) )
+            {
+                string event_name = json["event"] as string;
+                if (event_name.CompareTo("start_Sensor") == 0)
+                {
+                    if (!sensor.OnStart())
+                    {
+                        Log.Error("SensorManager", "Failed to start sensor {0}", sensorId);
+                        bFailed = true;
+                    }
+                }
+                else if (event_name.CompareTo("stop_sensor") == 0)
+                {
+                    if (!sensor.OnStop())
+                    {
+                        Log.Error("SensorManager", "OnStop() returned failure for sensor {0}", sensorId);
+                        bFailed = true;
+                    }
+                }
+                else if (event_name.CompareTo("pause_sensor") == 0)
+                    sensor.OnPause();
+                else if (event_name.CompareTo("resume_sensor") == 0)
+                    sensor.OnResume();
+                else
+                {
+                    Log.Warning( "SensorManager", "Unknown event {0}", event_name );
+                    bFailed = true;
+                }
+            }
+            else
+            {
+                Log.Error( "SensorManager", "Failed to find sensor {0}", sensorId );
+                bFailed = true;
+            }
+
+            // if we failed, send the message back with a different event
+            if ( bFailed )
+            {
+                json["failed_event"] = json["event"];
+                json["event"] = "error";
+
+                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( json ) );
+            }
+
         }
     }
 

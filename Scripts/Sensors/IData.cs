@@ -19,7 +19,7 @@ using System;
 using System.Collections;
 using System.Text;
 
-namespace IBM.Watson.Self
+namespace IBM.Watson.Self.Sensors
 {
     //! Interface for any type of data that can be sent by a sensor.
     public abstract class IData
