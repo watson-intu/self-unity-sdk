@@ -24,9 +24,13 @@ namespace IBM.Watson.Self
     //! Interface for any object that should be a sensor
     public abstract class ISensor
     {
+        #region Private Data
+        string m_SensorId = Guid.NewGuid().ToString();
+        #endregion
+
         #region ISensor interface
         public abstract string GetSensorName();
-        public abstract Type GetSensorDataType();
+        public abstract string GetDataType();
         public abstract string GetBinaryType();
         public abstract bool OnStart();
         public abstract bool OnStop();
