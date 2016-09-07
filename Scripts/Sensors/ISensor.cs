@@ -29,7 +29,7 @@ namespace IBM.Watson.Self.Sensors
         string m_SensorId = Guid.NewGuid().ToString();
         #endregion
 
-        #region ISensor interface
+        #region Interface
         public abstract string GetSensorName();
         public abstract string GetDataType();
         public abstract string GetBinaryType();

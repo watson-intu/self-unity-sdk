@@ -21,10 +21,17 @@ namespace Assets.SelfUnitySDK.Scripts.Gestures
     //! This is the base class for a self gesture. 
     public abstract class IGesture
     {
+        public delegate void GestureDone( IGesture a_Gesture );
+
         #region Interface
         public abstract bool OnStart();     // this is invoked to start this gesture, if false is returned then the gesture will not be registered.
         public abstract bool OnStop();      // invoked to shutdown this gesture
-        public abstract bool CanExecute( IDictionary a_Params );        // invoked to check if this gesture can be executed with the given parameters
+        public abstract bool CanExecute( IDictionary a_Params );  
+	//! This function will be called by a Skill object, this object should invoke the provided
+	//! callback as the state of this gesture changes. 
+        public abstract bool Execute( GestureDone a_Callback, IDictionary a_Params );
+        //! Abort this gesture, if true is returned then abort succeeded and callback will NOT be invoked.
+        public abstract bool Abort();       
         #endregion
     }
 }
