@@ -38,7 +38,8 @@ namespace IBM.Watson.Self.Widgets
         }
         #endregion
 
-		private void OnAudioInput(Data data)
+        #region Input Handlers
+        private void OnAudioInput(Data data)
 		{
 			DeveloperCloud.DataTypes.AudioData audioData = data as DeveloperCloud.DataTypes.AudioData;
             if ( audioData != null )
@@ -49,7 +50,7 @@ namespace IBM.Watson.Self.Widgets
                 if ( m_Connection.IsStarted && !m_Connection.IsPaused )
                     m_Connection.SendData( new Sensors.AudioData( audioData ) );
             }
-			// Raise event for Pebble Manager - User is speaking
 		}
+        #endregion
     }
 }
