@@ -19,10 +19,10 @@ using System;
 using System.Collections;
 using System.Text;
 
-namespace IBM.Watson.Self
+namespace IBM.Watson.Self.Sensors
 {
     //! Interface for any type of data that can be sent by a sensor.
-    public abstract class IData
+    public abstract class ISensorData
     {
         #region IData interface
         public abstract byte [] ToBinary();         // convert this data into a binary block of data suitable for sending

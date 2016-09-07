@@ -26,7 +26,6 @@ using WebSocketSharp;
 
 namespace IBM.Watson.Self.Topics
 {
-
     public class TopicClient
     {
         #region Public Types

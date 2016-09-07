@@ -15,29 +15,37 @@
 *
 */
 
+using IBM.Watson.DeveloperCloud.Utilities;
+using IBM.Watson.Self.Topics;
 using System;
-using System.Collections;
-using System.Text;
 
-namespace IBM.Watson.Self
+namespace IBM.Watson.Self.Sensors
 {
     //! Interface for any object that should be a sensor
     public abstract class ISensor
     {
+        #region Private Data
+        string m_SensorId = Guid.NewGuid().ToString();
+        #endregion
+
         #region ISensor interface
         public abstract string GetSensorName();
-        public abstract Type GetSensorDataType();
+        public abstract string GetDataType();
         public abstract string GetBinaryType();
         public abstract bool OnStart();
         public abstract bool OnStop();
         public abstract void OnPause();
         public abstract void OnResume();
         #endregion
-
-        #region Internal Interface
-        protected void SendData( IData a_Data )
+    
+        #region Public Functions
+        public string GetSensorId() { return m_SensorId; }
+        public void SendData( ISensorData a_Data )
         {
+            if (! SensorManager.Instance.IsRegistered( this ) )
+                throw new WatsonException( "SendData() invoked on unregisted sensors." );
 
+            TopicClient.Instance.Publish( "sensor-proxy-" + m_SensorId, a_Data.ToBinary() );
         }
         #endregion
     }
