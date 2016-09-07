@@ -21,7 +21,8 @@ using System;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! Interface for any object that should be a sensor
+    //! Base class for any object that should be a sensor. The user should implement the abstract interface, register the object with SensorManager,
+    //! then should invoke SendData() when new sensor data is generated.
     public abstract class ISensor
     {
         #region Private Data
@@ -32,8 +33,8 @@ namespace IBM.Watson.Self.Sensors
         public abstract string GetSensorName();
         public abstract string GetDataType();
         public abstract string GetBinaryType();
-        public abstract bool OnStart();
-        public abstract bool OnStop();
+        public abstract bool OnStart();             //! This is invoked when this sensor shoudl start calling SendData()
+        public abstract bool OnStop();              //! This is invoked when the last subscriber unsubscribe from this sensor
         public abstract void OnPause();
         public abstract void OnResume();
         #endregion

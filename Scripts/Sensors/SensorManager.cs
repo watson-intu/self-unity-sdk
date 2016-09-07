@@ -47,9 +47,9 @@ namespace IBM.Watson.Self.Sensors
             return m_Sensors.ContainsKey( a_Sensor.GetSensorId() );
         }
 
-        //! Register a sensor with the remote self instance, agents may now subscribe to this 
+        //! Add a sensor with the remote self instance, agents may now subscribe to this 
         //! sensor and OnStart() will be invoked automatically by this framework.
-        public void RegisterSensor( ISensor a_Sensor )
+        public void AddSensor( ISensor a_Sensor )
         {
             if (! m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
@@ -67,16 +67,8 @@ namespace IBM.Watson.Self.Sensors
             }
         }
 
-        public void SendData( ISensor a_pSensor, ISensorData a_Data )
-        {
-            if (! SensorManager.Instance.IsRegistered( a_pSensor ) )
-                throw new WatsonException( "SendData() invoked on unregisted sensors." );
-
-            TopicClient.Instance.Publish( "sensor-proxy-" + a_pSensor.GetSensorId(), a_Data.ToBinary() );
-        }
-
-        //! Unregister the provided sensor object.
-        public void UnregisterSensor( ISensor a_Sensor )
+        //! Remove the provided sensor from the remote self instance.
+        public void RemoveSensor( ISensor a_Sensor )
         {
             if ( m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
@@ -93,6 +85,8 @@ namespace IBM.Watson.Self.Sensors
 
         #endregion
 
+        #region Callback Functions
+        //! Callback for sensor-manager topic.
         void OnSensorManagerEvent( TopicClient.Payload a_Payload )
         {
             IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( a_Payload.Data ) ) as IDictionary;
@@ -139,8 +133,9 @@ namespace IBM.Watson.Self.Sensors
 
                 TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( json ) );
             }
-
         }
+        #endregion
+
     }
 
 }

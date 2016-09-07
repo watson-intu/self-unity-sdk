@@ -19,7 +19,7 @@ GameObject:
   serializedVersion: 4
   m_Component:
   - 4: {fileID: 4000012735503970}
-  - 114: {fileID: 114000012030735008}
+  - 114: {fileID: 114000011196000370}
   m_Layer: 0
   m_Name: MicrophoneSensor
   m_TagString: Untagged
@@ -40,7 +40,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
---- !u!114 &114000012030735008
+--- !u!114 &114000011196000370
 MonoBehaviour:
   m_ObjectHideFlags: 1
   m_PrefabParentObject: {fileID: 0}
@@ -48,7 +48,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1000011007810106}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 08f01250737e2ec44a5022ef817de6f4, type: 3}
+  m_Script: {fileID: 11500000, guid: 7f90e31732e76064fa6cd56cf6deb3a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_AutoConnect: 1
