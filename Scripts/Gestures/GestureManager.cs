@@ -30,7 +30,7 @@ namespace IBM.Watson.Self.Gestures
     public class GestureManager
     {
         #region Private Data
-        Dictionary<string, IGesture> m_Gestures = new Dictionary<string, IGesture>();
+        private Dictionary<string, IGesture> m_Gestures = new Dictionary<string, IGesture>();
         #endregion
 
         #region Public Interface
@@ -46,9 +46,10 @@ namespace IBM.Watson.Self.Gestures
             return m_Gestures.ContainsKey( a_Gesture.GetGestureId() );
         }
 
-        //! Add a sensor with the remote self instance, agents may now subscribe to this 
-        //! sensor and OnStart() will be invoked automatically by this framework.
-        public void AddGesture( IGesture a_Gesture )
+        // register a new gesture with self. If a_bOVerride is true, then any previous gesture with the same ID
+        // will be replaced by this new gesture. If false, then this gesture will be added alongside any existing gestures
+        // with the same ID.
+        public void AddGesture( IGesture a_Gesture, bool a_bOverride = true )
         {
             if (! m_Gestures.ContainsKey( a_Gesture.GetGestureId() ) )
             {
@@ -57,7 +58,7 @@ namespace IBM.Watson.Self.Gestures
                     Dictionary<string,object> register = new Dictionary<string, object>();
                     register["event"] = "add_gesture_proxy";
                     register["gestureId"] = a_Gesture.GetGestureId();
-                    register["name"] = a_Gesture.GetGestureName();
+                    register["override"] = a_bOverride;
 
                     TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
                     m_Gestures[ a_Gesture.GetGestureId() ] = a_Gesture;
@@ -89,6 +90,36 @@ namespace IBM.Watson.Self.Gestures
         #endregion
 
         #region Callback Functions
+
+        // object used to handle a execute gesture request and return a response when completed.
+        private class ExecuteRequest
+        {
+            private IGesture m_Gesture;
+            private int m_Request;
+
+            public ExecuteRequest(IGesture a_Gesture, int a_Request, IDictionary a_Params)
+            {
+                m_Gesture = a_Gesture;
+                m_Request = a_Request;
+
+                if (!m_Gesture.Execute(OnGestureDone, a_Params))
+                    throw new WatsonException("Failed to invoke execute");
+            }
+
+            void OnGestureDone( IGesture a_Gesture, bool a_Error )
+            {
+                if (a_Gesture != m_Gesture)
+                    throw new WatsonException("a_Gesture != m_Gesture");
+
+                Dictionary<string, object> response = new Dictionary<string, object>();
+                response["event"] = "execute_done";
+                response["request"] = m_Request;
+                response["error"] = a_Error;
+
+                TopicClient.Instance.Publish("gesture-manager", Json.Serialize(response));
+            }
+        };
+
         //! Callback for sensor-manager topic.
         void OnGestureManagerEvent( TopicClient.Payload a_Payload )
         {
@@ -96,42 +127,43 @@ namespace IBM.Watson.Self.Gestures
 
             bool bFailed = false;
             string gestureId = json["gestureId"] as string;
+            string event_name = json["event"] as string;
 
             IGesture gesture = null;
             if ( m_Gestures.TryGetValue( gestureId, out gesture ) )
             {
-                string event_name = json["event"] as string;
                 if (event_name.CompareTo("execute_gesture") == 0)
                 {
-                    if (!gesture.OnStart())
+                    int request = (int)json["request"];
+
+                    try {
+                        new ExecuteRequest(gesture, request, json["params"] as IDictionary);
+                    }
+                    catch (WatsonException ex)
                     {
-                        Log.Error("GestureManager", "Failed to start gesture {0}", gestureId);
+                        Log.Error("GestureManager", "Failed to execute gesture {0}: {1}", gestureId, ex.Message );
                         bFailed = true;
                     }
                 }
-                else if (event_name.CompareTo("stop_sensor") == 0)
+                else if (event_name.CompareTo("abort_gesture") == 0)
                 {
-                    if (!gesture.OnStop())
+                    if (!gesture.Abort())
                     {
-                        Log.Error("GestureManager", "OnStop() returned failure for sensor {0}", gestureId);
+                        Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
                         bFailed = true;
                     }
                 }
-                else if (event_name.CompareTo("pause_sensor") == 0)
-                    gesture.OnPause();
-                else if (event_name.CompareTo("resume_sensor") == 0)
-                    gesture.OnResume();
             }
             else
             {
-                Log.Error( "GestureManager", "Failed to find sensor {0}", gestureId );
+                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureId );
                 bFailed = true;
             }
 
             // if we failed, send the message back with a different event
             if ( bFailed )
             {
-                json["failed_event"] = json["event"];
+                json["failed_event"] = event_name;
                 json["event"] = "error";
 
                 TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( json ) );

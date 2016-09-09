@@ -140,6 +140,7 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host,
             string a_GroupId,
+            string a_selfId = null,
             OnConnected a_OnConnected = null,
             OnDisconnected a_OnDisconnected = null )
         {
@@ -150,10 +151,13 @@ namespace IBM.Watson.Self.Topics
                 return false;
             }
 
+            if ( string.IsNullOrEmpty( a_selfId ) )
+                a_selfId = Utility.MacAddress;
+
             m_Host = a_Host;
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
-            m_SelfId = Utility.MacAddress;
+            m_SelfId = a_selfId;
             m_OnConnected = a_OnConnected;
             m_OnDisconnected = a_OnDisconnected;
 
@@ -172,7 +176,7 @@ namespace IBM.Watson.Self.Topics
             if ( m_ReconnectRoutine < 0 )
                 m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
             if ( m_PublishRoutine < 0 )
-                m_PublishRoutine = Runnable.Run( OnPublish() );
+                m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
             return true;
         }
 
@@ -429,7 +433,7 @@ namespace IBM.Watson.Self.Topics
                     while( (DateTime.Now - start).TotalSeconds < RECONNECT_INTERVAL )
                         yield return null;
 
-                    Connect( m_Host, m_GroupId, m_OnConnected, m_OnDisconnected );
+                    Connect( m_Host, m_GroupId, m_SelfId, m_OnConnected, m_OnDisconnected );
                 }
                 else
                     yield return null;

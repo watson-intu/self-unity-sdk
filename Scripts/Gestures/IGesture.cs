@@ -27,27 +27,17 @@ namespace IBM.Watson.Self.Gestures
         public delegate void GestureDone(IGesture a_Gesture, bool a_bError);
         #endregion
 
-        #region Private Data
-        private string m_GestureId = Guid.NewGuid().ToString();
-        #endregion
-
         #region Interface
-        //! name of this gesture, this name is used to override a core gesture.
-        public abstract string GetGestureName();
+        //! The ID of this gesture.
+        public abstract string GetGestureId();
         //! Initialize this gesture object, returns false if gesture can't be initialized
         public abstract bool OnStart();
         //! Shutdown this gesture object.
         public abstract bool OnStop();
-        //! Test if this gesture can be executed with the given parameters.
-        public abstract bool CanExecute(IDictionary a_Params);
         //! Execute this gesture, the provided callback should be invoked when the gesture is complete.
         public abstract bool Execute(GestureDone a_Callback, IDictionary a_Params);
         //! Abort this gesture, if true is returned then abort succeeded and callback will NOT be invoked.
         public abstract bool Abort();
-        #endregion
-
-        #region Public Methods
-        public string GetGestureId() { return m_GestureId; }
         #endregion
     }
 }
