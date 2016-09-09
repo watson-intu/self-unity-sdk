@@ -197,6 +197,7 @@ namespace IBM.Watson.Self.Topics
             {
                 m_eState = ClientState.Closing;
                 m_Socket.CloseAsync();
+                m_Socket = null;
             }
         }
 
@@ -206,9 +207,6 @@ namespace IBM.Watson.Self.Topics
             string a_Data,
             bool a_bPersisted = false)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
             publish["origin"] = m_SelfId + "/.";
@@ -226,9 +224,6 @@ namespace IBM.Watson.Self.Topics
             byte [] a_Data,
             bool a_bPersisted = false )
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
             publish["origin"] = m_SelfId + "/.";
@@ -244,9 +239,6 @@ namespace IBM.Watson.Self.Topics
         public void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
             OnQueryResponse a_Callback)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             int reqId = m_ReqId++;
             m_QueryRequestMap[ reqId ] = a_Callback;
 
@@ -263,9 +255,6 @@ namespace IBM.Watson.Self.Topics
         public void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             if (! m_SubscriptionMap.ContainsKey( a_Path ) )
                 m_SubscriptionMap[ a_Path ] = new List<Subscription>();
             m_SubscriptionMap[ a_Path ].Add( new Subscription( a_Path, a_Callback ) );
@@ -497,7 +486,7 @@ namespace IBM.Watson.Self.Topics
             else
             {
                 string send = Json.Serialize( a_json );
-                if ( m_eState == ClientState.Connected )
+                if ( m_Socket != null && m_eState == ClientState.Connected )
                     m_Socket.Send( send );
                 else
                     m_SendQueue.Add( send );

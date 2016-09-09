@@ -20,24 +20,22 @@ using System.Collections;
 
 namespace IBM.Watson.Self.Gestures
 {
-    //! This is the base class for a self gesture. 
-    public abstract class IGesture
-    {
-        #region Public Types
-        public delegate void GestureDone(IGesture a_Gesture, bool a_bError);
-        #endregion
+    public delegate void OnGestureDone(IGesture a_Gesture, bool a_bError);
 
-        #region Interface
+    //! This is the base class for a self gesture. 
+    public interface IGesture
+    {
         //! The ID of this gesture.
-        public abstract string GetGestureId();
+        string GetGestureId();
+        //! return an ID unique to this instance
+        string GetInstanceId();
         //! Initialize this gesture object, returns false if gesture can't be initialized
-        public abstract bool OnStart();
+        bool OnStart();
         //! Shutdown this gesture object.
-        public abstract bool OnStop();
+        bool OnStop();
         //! Execute this gesture, the provided callback should be invoked when the gesture is complete.
-        public abstract bool Execute(GestureDone a_Callback, IDictionary a_Params);
+        bool Execute(OnGestureDone a_Callback, IDictionary a_Params);
         //! Abort this gesture, if true is returned then abort succeeded and callback will NOT be invoked.
-        public abstract bool Abort();
-        #endregion
+        bool Abort();
     }
 }

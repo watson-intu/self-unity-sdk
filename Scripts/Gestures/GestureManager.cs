@@ -51,19 +51,21 @@ namespace IBM.Watson.Self.Gestures
         // with the same ID.
         public void AddGesture( IGesture a_Gesture, bool a_bOverride = true )
         {
-            if (! m_Gestures.ContainsKey( a_Gesture.GetGestureId() ) )
+            string gestureKey = a_Gesture.GetGestureId() + "/" + a_Gesture.GetInstanceId();
+            if (! m_Gestures.ContainsKey(gestureKey) )
             {
                 if ( a_Gesture.OnStart() )
                 {
                     Dictionary<string,object> register = new Dictionary<string, object>();
                     register["event"] = "add_gesture_proxy";
                     register["gestureId"] = a_Gesture.GetGestureId();
+                    register["instanceId"] = a_Gesture.GetInstanceId();
                     register["override"] = a_bOverride;
 
                     TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
-                    m_Gestures[ a_Gesture.GetGestureId() ] = a_Gesture;
+                    m_Gestures[gestureKey] = a_Gesture;
 
-                    Log.Status( "GestureManager", "Gesture {0} added.", a_Gesture.GetGestureId() );
+                    Log.Status( "GestureManager", "Gesture {0} added.", gestureKey );
                 }
             }
         }
@@ -71,18 +73,20 @@ namespace IBM.Watson.Self.Gestures
         //! Remove the provided sensor from the remote self instance.
         public void RemoveGesture( IGesture a_Gesture )
         {
-            if ( m_Gestures.ContainsKey( a_Gesture.GetGestureId() ) )
+            string gestureKey = a_Gesture.GetGestureId() + "/" + a_Gesture.GetInstanceId();
+            if ( m_Gestures.ContainsKey(gestureKey) )
             {
                 if ( a_Gesture.OnStop() )
                 {
-                    m_Gestures.Remove( a_Gesture.GetGestureId() );
+                    m_Gestures.Remove(gestureKey);
 
                     Dictionary<string,object> register = new Dictionary<string, object>();
                     register["event"] = "remove_gesture_proxy";
                     register["gestureId"] = a_Gesture.GetGestureId();
+                    register["instanceId"] = a_Gesture.GetInstanceId();
 
                     TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
-                    Log.Status( "GestureManager", "Gesture {0} removed.", a_Gesture.GetGestureId() );
+                    Log.Status( "GestureManager", "Gesture {0} removed.", gestureKey );
                 }
             }
         }
@@ -91,35 +95,6 @@ namespace IBM.Watson.Self.Gestures
 
         #region Callback Functions
 
-        // object used to handle a execute gesture request and return a response when completed.
-        private class ExecuteRequest
-        {
-            private IGesture m_Gesture;
-            private int m_Request;
-
-            public ExecuteRequest(IGesture a_Gesture, int a_Request, IDictionary a_Params)
-            {
-                m_Gesture = a_Gesture;
-                m_Request = a_Request;
-
-                if (!m_Gesture.Execute(OnGestureDone, a_Params))
-                    throw new WatsonException("Failed to invoke execute");
-            }
-
-            void OnGestureDone( IGesture a_Gesture, bool a_Error )
-            {
-                if (a_Gesture != m_Gesture)
-                    throw new WatsonException("a_Gesture != m_Gesture");
-
-                Dictionary<string, object> response = new Dictionary<string, object>();
-                response["event"] = "execute_done";
-                response["request"] = m_Request;
-                response["error"] = a_Error;
-
-                TopicClient.Instance.Publish("gesture-manager", Json.Serialize(response));
-            }
-        };
-
         //! Callback for sensor-manager topic.
         void OnGestureManagerEvent( TopicClient.Payload a_Payload )
         {
@@ -127,21 +102,18 @@ namespace IBM.Watson.Self.Gestures
 
             bool bFailed = false;
             string gestureId = json["gestureId"] as string;
+            string instanceId = json["instanceId"] as string;
+            string gestureKey = gestureId + "/" + instanceId;
             string event_name = json["event"] as string;
 
             IGesture gesture = null;
-            if ( m_Gestures.TryGetValue( gestureId, out gesture ) )
+            if ( m_Gestures.TryGetValue(gestureKey, out gesture ) )
             {
                 if (event_name.CompareTo("execute_gesture") == 0)
                 {
-                    int request = (int)json["request"];
-
-                    try {
-                        new ExecuteRequest(gesture, request, json["params"] as IDictionary);
-                    }
-                    catch (WatsonException ex)
+                    if (! gesture.Execute( OnGestureDone, json["params"] as IDictionary ) )
                     {
-                        Log.Error("GestureManager", "Failed to execute gesture {0}: {1}", gestureId, ex.Message );
+                        Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId );
                         bFailed = true;
                     }
                 }
@@ -156,7 +128,7 @@ namespace IBM.Watson.Self.Gestures
             }
             else
             {
-                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureId );
+                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureKey);
                 bFailed = true;
             }
 
@@ -169,6 +141,17 @@ namespace IBM.Watson.Self.Gestures
                 TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( json ) );
             }
         }
+        void OnGestureDone(IGesture a_Gesture, bool a_Error)
+        {
+            Dictionary<string, object> response = new Dictionary<string, object>();
+            response["event"] = "execute_done";
+            response["gestureId"] = a_Gesture.GetGestureId();
+            response["instanceId"] = a_Gesture.GetInstanceId();
+            response["error"] = a_Error;
+
+            TopicClient.Instance.Publish("gesture-manager", Json.Serialize(response));
+        }
+
         #endregion
     }
 

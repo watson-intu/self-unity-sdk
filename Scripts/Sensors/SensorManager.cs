@@ -67,6 +67,14 @@ namespace IBM.Watson.Self.Sensors
             }
         }
 
+        public void SendData( ISensor a_Sensor, ISensorData a_Data)
+        {
+            if (!IsRegistered(a_Sensor))
+                throw new WatsonException("SendData() invoked on unregisted sensors.");
+
+            TopicClient.Instance.Publish("sensor-proxy-" + a_Sensor.GetSensorId(), a_Data.ToBinary());
+        }
+
         //! Remove the provided sensor from the remote self instance.
         public void RemoveSensor( ISensor a_Sensor )
         {
