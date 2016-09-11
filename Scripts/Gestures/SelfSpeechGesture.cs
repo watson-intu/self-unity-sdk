@@ -18,7 +18,6 @@
 
 using IBM.Watson.DeveloperCloud.DataTypes;
 using IBM.Watson.DeveloperCloud.Widgets;
-using IBM.Watson.Self.Topics;
 using System;
 using System.Collections;
 using UnityEngine;
