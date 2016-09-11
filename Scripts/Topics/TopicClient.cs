@@ -110,7 +110,8 @@ namespace IBM.Watson.Self.Topics
         OnConnected     m_OnConnected = null;
         OnDisconnected  m_OnDisconnected = null;
         ClientState     m_eState = ClientState.Inactive;
-        List<object>    m_SendQueue = new List<object>();
+        List<IDictionary>    
+                        m_SendQueue = new List<IDictionary>();
         int             m_ReqId = 1;
         Dictionary<int,OnQueryResponse> 
                         m_QueryRequestMap = new Dictionary<int, OnQueryResponse>();
@@ -209,7 +210,6 @@ namespace IBM.Watson.Self.Topics
         {
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = false;
@@ -226,7 +226,6 @@ namespace IBM.Watson.Self.Topics
         {
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = true;
@@ -244,7 +243,6 @@ namespace IBM.Watson.Self.Topics
 
             Dictionary<string, object> query = new Dictionary<string, object>();
             query["targets"] = new string[] { a_Path };
-            query["origin"] = m_SelfId + "/.";
             query["msg"] = "query";
             query["request"] = reqId;
 
@@ -261,7 +259,6 @@ namespace IBM.Watson.Self.Topics
 
             Dictionary<string,object> sub = new Dictionary<string, object>();
             sub["targets"] = new string[] { a_Path };
-            sub["origin"] = m_SelfId + "/.";
             sub["msg"] = "subscribe";
 
             SendMessage( sub );
@@ -294,7 +291,6 @@ namespace IBM.Watson.Self.Topics
 
                 Dictionary<string,object> unsub = new Dictionary<string, object>();
                 unsub["targets"] = new string[] { a_Path };
-                unsub["origin"] = m_SelfId + "/.";
                 unsub["msg"] = "unsubscribe";
 
                 SendMessage( unsub );
@@ -378,13 +374,7 @@ namespace IBM.Watson.Self.Topics
                 m_OnConnected();
 
             for(int i=0;i<m_SendQueue.Count;++i)
-            {
-                object send = m_SendQueue[i];
-                if ( send is byte[] )
-                    m_Socket.Send( send as byte[] );
-                else if ( send is string )
-                    m_Socket.Send( send as string );
-            }
+                SendMessage( m_SendQueue[i] );
             m_SendQueue.Clear();
         }
 
@@ -465,32 +455,32 @@ namespace IBM.Watson.Self.Topics
         #endregion
 
         #region Private Functions
-        void SendMessage( Dictionary<string,object> a_json )
+        void SendMessage( IDictionary a_message )
         {
-            if ( a_json.ContainsKey( "binary" ) && ((bool)a_json["binary"]) != false )
+            if ( m_Socket != null && m_eState == ClientState.Connected )
             {
-                byte [] data = a_json["data"] as byte [];
-                a_json["data"] = data.Length;
+                a_message["origin"] = m_SelfId + "/.";
+                if ( a_message.Contains( "binary" ) && ((bool)a_message["binary"]) != false )
+                {
+                    byte [] data = a_message["data"] as byte [];
+                    a_message["data"] = data.Length;
 
-                byte [] header = Encoding.UTF8.GetBytes( Json.Serialize( a_json ) );
-                byte [] frame = new byte [ header.Length + data.Length + 1 ];
+                    byte [] header = Encoding.UTF8.GetBytes( Json.Serialize( a_message ) );
+                    byte [] frame = new byte [ header.Length + data.Length + 1 ];
 
-                Buffer.BlockCopy( header, 0, frame, 0, header.Length );
-                Buffer.BlockCopy( data, 0, frame, header.Length + 1, data.Length );
+                    Buffer.BlockCopy( header, 0, frame, 0, header.Length );
+                    Buffer.BlockCopy( data, 0, frame, header.Length + 1, data.Length );
 
-                if ( m_eState == ClientState.Connected )
                     m_Socket.Send(frame);
+                }
                 else
-                    m_SendQueue.Add(frame);
+                {
+                    string send = Json.Serialize( a_message );
+                    m_Socket.Send( send );
+                }
             }
             else
-            {
-                string send = Json.Serialize( a_json );
-                if ( m_Socket != null && m_eState == ClientState.Connected )
-                    m_Socket.Send( send );
-                else
-                    m_SendQueue.Add( send );
-            }
+                m_SendQueue.Add( a_message );
         }
         #endregion
 
@@ -541,7 +531,6 @@ namespace IBM.Watson.Self.Topics
 
             Dictionary<string,object> resp = new Dictionary<string, object>();
             resp["targets"] = new string[] { OriginToPath( (string)a_Message["origin"] ) };
-            resp["origin"] = m_SelfId + "/.";
             resp["msg"] = "query_response";
             resp["request"] = (string)a_Message["request"];
             resp["selfId"] = m_SelfId;

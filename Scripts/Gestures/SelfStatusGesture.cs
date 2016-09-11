@@ -40,10 +40,6 @@ namespace IBM.Watson.Self.Gestures
             base.Start();
             GestureManager.Instance.AddGesture(this, m_Override);
         }
-        protected void OnDestroy()
-        {
-            GestureManager.Instance.RemoveGesture(this);
-        }
         #endregion
 
         #region Widget interface
