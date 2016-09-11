@@ -15,8 +15,6 @@
 *
 */
 
-
-using IBM.Watson.DeveloperCloud.DataTypes;
 using IBM.Watson.DeveloperCloud.Widgets;
 using System;
 using System.Collections;
@@ -24,15 +22,15 @@ using UnityEngine;
 
 namespace IBM.Watson.Self.Gestures
 {
-    public class SelfSpeechGesture : Widget, IGesture
+    public class SelfStatusGesture : Widget, IGesture
     {
         #region Private Data
         [SerializeField]
-        private Output m_TextOutput = new Output(typeof(TextToSpeechData), true);
-        [SerializeField]
-        private string m_GestureId = "tts";
+        private string m_GestureId = "update_status";
         [SerializeField]
         private bool m_Override = true;
+		[SerializeField]
+		private Output m_Status = new Output( typeof(StatusData), true );
         private string m_InstanceId = Guid.NewGuid().ToString();
         #endregion
 
@@ -46,7 +44,7 @@ namespace IBM.Watson.Self.Gestures
         {
             GestureManager.Instance.RemoveGesture(this);
         }
-         #endregion
+        #endregion
 
         #region Widget interface
         protected override string GetName()
@@ -81,13 +79,8 @@ namespace IBM.Watson.Self.Gestures
         {
             bool bError = false;
 
-            string text = a_Params["text"] as string;
-            string gender = a_Params["gender"] as string;
-            string language = a_Params["language"] as string;
-
-            // TODO: implement gender & language support
-            if (string.IsNullOrEmpty(text) || !m_TextOutput.SendData(new TextToSpeechData(text)))
-                bError = true;
+            string status = a_Params["status"] as string;
+            m_Status.SendData( new StatusData(status));
 
             if (a_Callback != null)
                 a_Callback(this, bError);
