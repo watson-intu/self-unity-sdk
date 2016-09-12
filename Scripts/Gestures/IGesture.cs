@@ -14,17 +14,28 @@
 * limitations under the License.
 */
 
+
+using System;
 using System.Collections;
 
-namespace Assets.SelfUnitySDK.Scripts.Gestures
+namespace IBM.Watson.Self.Gestures
 {
+    public delegate void OnGestureDone(IGesture a_Gesture, bool a_bError);
+
     //! This is the base class for a self gesture. 
-    public abstract class IGesture
+    public interface IGesture
     {
-        #region Interface
-        public abstract bool OnStart();     // this is invoked to start this gesture, if false is returned then the gesture will not be registered.
-        public abstract bool OnStop();      // invoked to shutdown this gesture
-        public abstract bool CanExecute( IDictionary a_Params );        // invoked to check if this gesture can be executed with the given parameters
-        #endregion
+        //! The ID of this gesture.
+        string GetGestureId();
+        //! return an ID unique to this instance
+        string GetInstanceId();
+        //! Initialize this gesture object, returns false if gesture can't be initialized
+        bool OnStart();
+        //! Shutdown this gesture object.
+        bool OnStop();
+        //! Execute this gesture, the provided callback should be invoked when the gesture is complete.
+        bool Execute(OnGestureDone a_Callback, IDictionary a_Params);
+        //! Abort this gesture, if true is returned then abort succeeded and callback will NOT be invoked.
+        bool Abort();
     }
 }

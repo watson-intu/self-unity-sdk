@@ -21,33 +21,23 @@ using System;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! Base class for any object that should be a sensor. The user should implement the abstract interface, register the object with SensorManager,
-    //! then should invoke SendData() when new sensor data is generated.
-    public abstract class ISensor
+    //! interface for any object that should be a sensor. The user should implement the interface, register the object with SensorManager,
+    //! then should invoke SensorManager.SendData() when new sensor data is generated.
+    public interface ISensor
     {
-        #region Private Data
-        string m_SensorId = Guid.NewGuid().ToString();
-        #endregion
-
-        #region ISensor interface
-        public abstract string GetSensorName();
-        public abstract string GetDataType();
-        public abstract string GetBinaryType();
-        public abstract bool OnStart();             //! This is invoked when this sensor shoudl start calling SendData()
-        public abstract bool OnStop();              //! This is invoked when the last subscriber unsubscribe from this sensor
-        public abstract void OnPause();
-        public abstract void OnResume();
-        #endregion
-    
-        #region Public Functions
-        public string GetSensorId() { return m_SensorId; }
-        public void SendData( ISensorData a_Data )
-        {
-            if (! SensorManager.Instance.IsRegistered( this ) )
-                throw new WatsonException( "SendData() invoked on unregisted sensors." );
-
-            TopicClient.Instance.Publish( "sensor-proxy-" + m_SensorId, a_Data.ToBinary() );
-        }
-        #endregion
+        //! This should return a unique ID for this sensor
+        string GetSensorId();
+        //! This should return a text name for this sensor
+        string GetSensorName();
+        //! This should return the type of data class this sensor sends
+        string GetDataType();
+        //! This should return the type of binary data
+        string GetBinaryType();
+        //! This is invoked when this sensor shoudl start calling SendData()
+        bool OnStart();
+        //! This is invoked when the last subscriber unsubscribe from this sensor
+        bool OnStop();   
+        void OnPause();
+        void OnResume();
     }
 }

@@ -15,9 +15,7 @@
 *
 */
 
-using UnityEngine;
 using System.Collections;
-using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.DeveloperCloud.UnitTests;
 using IBM.Watson.Self.Topics;
 using IBM.Watson.DeveloperCloud.Logging;
@@ -36,7 +34,7 @@ namespace IBM.Watson.Self.UnitTests
         {
             TopicClient client = TopicClient.Instance;
 
-            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", OnConnected, OnDisconnected );
+            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", null, OnConnected, OnDisconnected );
             while(! m_bQueryTested )
                 yield return null;
             while(! m_bSubscribeBinaryTested )

@@ -110,7 +110,8 @@ namespace IBM.Watson.Self.Topics
         OnConnected     m_OnConnected = null;
         OnDisconnected  m_OnDisconnected = null;
         ClientState     m_eState = ClientState.Inactive;
-        List<object>    m_SendQueue = new List<object>();
+        List<IDictionary>    
+                        m_SendQueue = new List<IDictionary>();
         int             m_ReqId = 1;
         Dictionary<int,OnQueryResponse> 
                         m_QueryRequestMap = new Dictionary<int, OnQueryResponse>();
@@ -140,6 +141,7 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host,
             string a_GroupId,
+            string a_selfId = null,
             OnConnected a_OnConnected = null,
             OnDisconnected a_OnDisconnected = null )
         {
@@ -150,10 +152,13 @@ namespace IBM.Watson.Self.Topics
                 return false;
             }
 
+            if ( string.IsNullOrEmpty( a_selfId ) )
+                a_selfId = Utility.MacAddress;
+
             m_Host = a_Host;
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
-            m_SelfId = Utility.MacAddress;
+            m_SelfId = a_selfId;
             m_OnConnected = a_OnConnected;
             m_OnDisconnected = a_OnDisconnected;
 
@@ -172,7 +177,7 @@ namespace IBM.Watson.Self.Topics
             if ( m_ReconnectRoutine < 0 )
                 m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
             if ( m_PublishRoutine < 0 )
-                m_PublishRoutine = Runnable.Run( OnPublish() );
+                m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
             return true;
         }
 
@@ -193,6 +198,7 @@ namespace IBM.Watson.Self.Topics
             {
                 m_eState = ClientState.Closing;
                 m_Socket.CloseAsync();
+                m_Socket = null;
             }
         }
 
@@ -202,12 +208,8 @@ namespace IBM.Watson.Self.Topics
             string a_Data,
             bool a_bPersisted = false)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = false;
@@ -222,12 +224,8 @@ namespace IBM.Watson.Self.Topics
             byte [] a_Data,
             bool a_bPersisted = false )
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             Dictionary<string,object> publish = new Dictionary<string, object>();
             publish["targets"] = new string[] { a_Path };
-            publish["origin"] = m_SelfId + "/.";
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = true;
@@ -240,15 +238,11 @@ namespace IBM.Watson.Self.Topics
         public void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
             OnQueryResponse a_Callback)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             int reqId = m_ReqId++;
             m_QueryRequestMap[ reqId ] = a_Callback;
 
             Dictionary<string, object> query = new Dictionary<string, object>();
             query["targets"] = new string[] { a_Path };
-            query["origin"] = m_SelfId + "/.";
             query["msg"] = "query";
             query["request"] = reqId;
 
@@ -259,16 +253,12 @@ namespace IBM.Watson.Self.Topics
         public void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
         {
-            if ( m_Socket == null )
-                throw new WatsonException( "Query called before calling Connect." );
-
             if (! m_SubscriptionMap.ContainsKey( a_Path ) )
                 m_SubscriptionMap[ a_Path ] = new List<Subscription>();
             m_SubscriptionMap[ a_Path ].Add( new Subscription( a_Path, a_Callback ) );
 
             Dictionary<string,object> sub = new Dictionary<string, object>();
             sub["targets"] = new string[] { a_Path };
-            sub["origin"] = m_SelfId + "/.";
             sub["msg"] = "subscribe";
 
             SendMessage( sub );
@@ -301,7 +291,6 @@ namespace IBM.Watson.Self.Topics
 
                 Dictionary<string,object> unsub = new Dictionary<string, object>();
                 unsub["targets"] = new string[] { a_Path };
-                unsub["origin"] = m_SelfId + "/.";
                 unsub["msg"] = "unsubscribe";
 
                 SendMessage( unsub );
@@ -385,13 +374,7 @@ namespace IBM.Watson.Self.Topics
                 m_OnConnected();
 
             for(int i=0;i<m_SendQueue.Count;++i)
-            {
-                object send = m_SendQueue[i];
-                if ( send is byte[] )
-                    m_Socket.Send( send as byte[] );
-                else if ( send is string )
-                    m_Socket.Send( send as string );
-            }
+                SendMessage( m_SendQueue[i] );
             m_SendQueue.Clear();
         }
 
@@ -429,7 +412,7 @@ namespace IBM.Watson.Self.Topics
                     while( (DateTime.Now - start).TotalSeconds < RECONNECT_INTERVAL )
                         yield return null;
 
-                    Connect( m_Host, m_GroupId, m_OnConnected, m_OnDisconnected );
+                    Connect( m_Host, m_GroupId, m_SelfId, m_OnConnected, m_OnDisconnected );
                 }
                 else
                     yield return null;
@@ -472,32 +455,32 @@ namespace IBM.Watson.Self.Topics
         #endregion
 
         #region Private Functions
-        void SendMessage( Dictionary<string,object> a_json )
+        void SendMessage( IDictionary a_message )
         {
-            if ( a_json.ContainsKey( "binary" ) && ((bool)a_json["binary"]) != false )
+            if ( m_Socket != null && m_eState == ClientState.Connected )
             {
-                byte [] data = a_json["data"] as byte [];
-                a_json["data"] = data.Length;
+                a_message["origin"] = m_SelfId + "/.";
+                if ( a_message.Contains( "binary" ) && ((bool)a_message["binary"]) != false )
+                {
+                    byte [] data = a_message["data"] as byte [];
+                    a_message["data"] = data.Length;
 
-                byte [] header = Encoding.UTF8.GetBytes( Json.Serialize( a_json ) );
-                byte [] frame = new byte [ header.Length + data.Length + 1 ];
+                    byte [] header = Encoding.UTF8.GetBytes( Json.Serialize( a_message ) );
+                    byte [] frame = new byte [ header.Length + data.Length + 1 ];
 
-                Buffer.BlockCopy( header, 0, frame, 0, header.Length );
-                Buffer.BlockCopy( data, 0, frame, header.Length + 1, data.Length );
+                    Buffer.BlockCopy( header, 0, frame, 0, header.Length );
+                    Buffer.BlockCopy( data, 0, frame, header.Length + 1, data.Length );
 
-                if ( m_eState == ClientState.Connected )
                     m_Socket.Send(frame);
+                }
                 else
-                    m_SendQueue.Add(frame);
+                {
+                    string send = Json.Serialize( a_message );
+                    m_Socket.Send( send );
+                }
             }
             else
-            {
-                string send = Json.Serialize( a_json );
-                if ( m_eState == ClientState.Connected )
-                    m_Socket.Send( send );
-                else
-                    m_SendQueue.Add( send );
-            }
+                m_SendQueue.Add( a_message );
         }
         #endregion
 
@@ -548,7 +531,6 @@ namespace IBM.Watson.Self.Topics
 
             Dictionary<string,object> resp = new Dictionary<string, object>();
             resp["targets"] = new string[] { OriginToPath( (string)a_Message["origin"] ) };
-            resp["origin"] = m_SelfId + "/.";
             resp["msg"] = "query_response";
             resp["request"] = (string)a_Message["request"];
             resp["selfId"] = m_SelfId;
