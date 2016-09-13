@@ -23,8 +23,10 @@ using System.Collections.Generic;
 using MiniJSON;
 using System.Text;
 using System.Collections;
+using IBM.Watson.DeveloperCloud.Logging;
+using System;
 
-namespace IBM.Watson.Self.BlackBoard
+namespace IBM.Watson.Self.Agents
 {
     public class BlackBoard
     {
@@ -45,6 +47,7 @@ namespace IBM.Watson.Self.BlackBoard
             public ThingEventType m_EventMask;
         }
         private Dictionary<string,List<Subscriber>>   m_SubscriberMap = new Dictionary<string, List<Subscriber>>();
+        private Dictionary<string,IThing> m_ThingMap = new Dictionary<string, IThing>();
         #endregion
 
         #region Public Interface
@@ -103,48 +106,60 @@ namespace IBM.Watson.Self.BlackBoard
 
             bool bFailed = false;
             string event_name = json["event"] as string;
+            string type = json["type"] as string;
+
+            ThingEvent te = new ThingEvent();
+            te.m_EventType = ThingEventType.TE_NONE;
+            te.m_Event = json;
 
             if ( event_name == "add_object" )
             {
+                te.m_EventType = ThingEventType.TE_ADDED;
+
+                // TODO: Create correct type based on type name, fall back to just making an IThing object
+                te.m_Thing = new IThing();
+                try {
+                    te.m_Thing.Deserialize( json["thing"] as IDictionary );
+                    Log.Debug( "BlackBoard", "Adding object {0}", te.m_Thing.GUID );
+
+                    if ( json.Contains( "parent" ) )
+                        te.m_Thing.ParentGUID = json["parent"] as string;
+                    m_ThingMap[ te.m_Thing.GUID ] = te.m_Thing;
+                }
+                catch( Exception e )
+                {
+                    Log.Error( "BlackBoard", "Failed to deserialize object: {0}, stack: {1}", e.Message, e.StackTrace );
+                    bFailed = true;
+                }
             }
             else if ( event_name == "remove_object" )
             {
+                te.m_EventType = ThingEventType.TE_REMOVED;
+
+                string guid = json["thing_guid"] as string;
+                if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
+                {
+                    Log.Debug( "BlackBoard", "Removing object {0}", guid );
+                    m_ThingMap.Remove( guid );
+                }
+                else
+                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
             }
             else if ( event_name == "set_object_state" )
             {
+                string guid = json["thing_guid"] as string;
+                if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
+                    te.m_Thing.State = json["state"] as string;
+                else
+                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
             }
             else if ( event_name == "set_object_importance" )
             {
-            }
-
-            string gestureId = json["gestureId"] as string;
-            string instanceId = json["instanceId"] as string;
-            string gestureKey = gestureId + "/" + instanceId;
-
-            IGesture gesture = null;
-            if ( m_Gestures.TryGetValue(gestureKey, out gesture ) )
-            {
-                if (event_name.CompareTo("execute_gesture") == 0)
-                {
-                    if (! gesture.Execute( OnGestureDone, json["params"] as IDictionary ) )
-                    {
-                        Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId );
-                        bFailed = true;
-                    }
-                }
-                else if (event_name.CompareTo("abort_gesture") == 0)
-                {
-                    if (!gesture.Abort())
-                    {
-                        Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
-                        bFailed = true;
-                    }
-                }
-            }
-            else
-            {
-                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureKey);
-                bFailed = true;
+                string guid = json["thing_guid"] as string;
+                if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
+                    te.m_Thing.Importance = (float)json["importance"];
+                else
+                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
             }
 
             // if we failed, send the message back with a different event
@@ -153,7 +168,24 @@ namespace IBM.Watson.Self.BlackBoard
                 json["failed_event"] = event_name;
                 json["event"] = "error";
 
-                TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( json ) );
+                TopicClient.Instance.Publish( "blackboard", Json.Serialize( json ) );
+            }
+            else if ( te.m_EventType != ThingEventType.TE_NONE )
+            {
+                List<Subscriber> subs = null;
+                if ( m_SubscriberMap.TryGetValue( type, out subs ) )
+                {
+                    for(int i=0;i<subs.Count;++i)
+                    {
+                        Subscriber sub = subs[i];
+                        if ( sub.m_Callback == null )
+                            continue;
+                        if ( (sub.m_EventMask & te.m_EventType) == 0 )
+                            continue;
+
+                        sub.m_Callback( te );
+                    }
+                }
             }
         }
     }
