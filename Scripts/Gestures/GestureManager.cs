@@ -22,8 +22,8 @@ using System.Text;
 
 using IBM.Watson.Self.Topics;
 using IBM.Watson.DeveloperCloud.Utilities;
-using MiniJSON;
 using IBM.Watson.DeveloperCloud.Logging;
+using MiniJSON;
 
 namespace IBM.Watson.Self.Gestures
 {
