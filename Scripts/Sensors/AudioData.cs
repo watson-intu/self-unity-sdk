@@ -19,6 +19,9 @@ using IBM.Watson.DeveloperCloud.Utilities;
 
 namespace IBM.Watson.Self.Sensors
 {
+    /// <summary>
+    /// Data container object for AudioData.
+    /// </summary>
     public class AudioData : ISensorData
     {
         public AudioData( DeveloperCloud.DataTypes.AudioData a_Audio )

@@ -21,7 +21,9 @@ using System.Text;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! Interface for any type of data that can be sent by a sensor.
+    /// <summary>
+    /// Interface for any type of data that can be sent by a sensor.
+    /// </summary>
     public abstract class ISensorData
     {
         #region ISensorData interface

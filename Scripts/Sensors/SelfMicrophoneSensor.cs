@@ -22,7 +22,9 @@ using UnityEngine;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! This widget works with the existing MicrophoneWidget from the Unity SDK
+    /// <summary>
+    /// This widget works with the existing MicrophoneWidget from the Unity SDK
+    /// </summary>
     public class SelfMicrophoneSensor : Widget, ISensor
     {
         #region Private Data

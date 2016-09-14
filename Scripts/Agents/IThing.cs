@@ -29,6 +29,9 @@ namespace IBM.Watson.Self.Agents
 	    TT_MODEL
     }
 
+    /// <summary>
+    /// This is the base class of any object that can be added into the blackboard.
+    /// </summary>
     public class IThing : ISerializable
     {
         #region Public Properties

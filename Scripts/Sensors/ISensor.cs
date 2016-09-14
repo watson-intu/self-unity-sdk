@@ -21,8 +21,10 @@ using System;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! interface for any object that should be a sensor. The user should implement the interface, register the object with SensorManager,
-    //! then should invoke SensorManager.SendData() when new sensor data is generated.
+    /// <summary>
+    /// interface for any object that should be a sensor. The user should implement the interface, register the object with SensorManager,
+    /// then should invoke SensorManager.SendData() when new sensor data is generated.
+    /// </summary>
     public interface ISensor
     {
         //! This should return a unique ID for this sensor
