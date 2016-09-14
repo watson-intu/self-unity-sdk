@@ -35,6 +35,8 @@ namespace IBM.Watson.Self.Sensors
 
         [SerializeField]
         protected Input m_AudioInput = new Input("Audio", typeof(DeveloperCloud.DataTypes.AudioData), "OnAudioInput");
+        [SerializeField]
+        protected bool m_bOverride = true;
         #endregion
 
         #region Widget interface
@@ -113,7 +115,7 @@ namespace IBM.Watson.Self.Sensors
             m_Channels = a_Channels;
             m_IsAdded = true;
 
-            SensorManager.Instance.AddSensor(this);
+            SensorManager.Instance.AddSensor(this, m_bOverride );
         }
         public void Remove()
         {

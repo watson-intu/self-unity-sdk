@@ -47,9 +47,13 @@ namespace IBM.Watson.Self.Sensors
             return m_Sensors.ContainsKey( a_Sensor.GetSensorId() );
         }
 
-        //! Add a sensor with the remote self instance, agents may now subscribe to this 
-        //! sensor and OnStart() will be invoked automatically by this framework.
-        public void AddSensor( ISensor a_Sensor )
+        /// <summary>
+        /// Add a sensor with the remote self instance, agents may now subscribe to this 
+        /// sensor and OnStart() will be invoked automatically by this framework.
+        /// </summary>
+        /// <param name="a_Sensor">The sensor object to add.</param>
+        /// <param name="a_bOverride">If true, then any remote sensor with the same name will be overridden.</param>
+        public void AddSensor( ISensor a_Sensor, bool a_bOverride )
         {
             if (! m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
@@ -59,6 +63,7 @@ namespace IBM.Watson.Self.Sensors
                 register["name"] = a_Sensor.GetSensorName();
                 register["data_type"] = a_Sensor.GetDataType();
                 register["binary_type"] = a_Sensor.GetBinaryType();
+                register["override"] = a_bOverride;
 
                 TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
                 m_Sensors[ a_Sensor.GetSensorId() ] = a_Sensor;
