@@ -26,6 +26,9 @@ using WebSocketSharp;
 
 namespace IBM.Watson.Self.Topics
 {
+    /// <summary>
+    /// This client allows a user to connect to the TopicManager embedded in SELF.
+    /// </summary>
     public class TopicClient
     {
         #region Public Types
@@ -107,8 +110,6 @@ namespace IBM.Watson.Self.Topics
         string          m_SelfId = null;
         string          m_ParentId = null;
         WebSocket       m_Socket = null;
-        OnConnected     m_OnConnected = null;
-        OnDisconnected  m_OnDisconnected = null;
         ClientState     m_eState = ClientState.Inactive;
         List<IDictionary>    
                         m_SendQueue = new List<IDictionary>();
@@ -131,6 +132,9 @@ namespace IBM.Watson.Self.Topics
         public string SelfId { get { return m_SelfId; } }
         public string Target { get; set; }
 
+        public OnConnected ConnectedEvent { get; set; }
+        public OnDisconnected DisconnectedEvent { get; set; }
+
         public TopicClient()
         {
             m_MessageHandlers["publish"] = HandlePublish;
@@ -142,9 +146,7 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host,
             string a_GroupId,
-            string a_selfId = null,
-            OnConnected a_OnConnected = null,
-            OnDisconnected a_OnDisconnected = null )
+            string a_selfId = null )
         {
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
@@ -160,8 +162,6 @@ namespace IBM.Watson.Self.Topics
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = a_selfId;
-            m_OnConnected = a_OnConnected;
-            m_OnDisconnected = a_OnDisconnected;
 
             m_Socket = new WebSocket( new Uri( new Uri( m_Host ), "/stream").AbsoluteUri );
             m_Socket.Headers = new Dictionary<string, string>();
@@ -374,9 +374,8 @@ namespace IBM.Watson.Self.Topics
             Log.Status("TopicClient", "Connected to {0}", m_Host );
             m_eState = ClientState.Connected;
 
-            if ( m_OnConnected != null )
-                m_OnConnected();
-
+            if ( ConnectedEvent != null )
+                ConnectedEvent();
             for(int i=0;i<m_SendQueue.Count;++i)
                 SendMessage( m_SendQueue[i] );
             m_SendQueue.Clear();
@@ -392,8 +391,8 @@ namespace IBM.Watson.Self.Topics
 
             if ( m_eState != ClientState.Closing )
                 m_eState = ClientState.Disconnected;
-            if ( m_OnDisconnected != null )
-                m_OnDisconnected();
+            if ( DisconnectedEvent != null )
+                DisconnectedEvent();
 
             if ( m_eState == ClientState.Closing )
             {
@@ -416,7 +415,7 @@ namespace IBM.Watson.Self.Topics
                     while( (DateTime.Now - start).TotalSeconds < RECONNECT_INTERVAL )
                         yield return null;
 
-                    Connect( m_Host, m_GroupId, m_SelfId, m_OnConnected, m_OnDisconnected );
+                    Connect( m_Host, m_GroupId, m_SelfId );
                 }
                 else
                     yield return null;

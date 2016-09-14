@@ -48,6 +48,7 @@ namespace IBM.Watson.Self.Agents
         }
         private Dictionary<string,List<Subscriber>>   m_SubscriberMap = new Dictionary<string, List<Subscriber>>();
         private Dictionary<string,IThing> m_ThingMap = new Dictionary<string, IThing>();
+        private bool m_bDisconnected = false;
         #endregion
 
         #region Public Interface
@@ -55,22 +56,28 @@ namespace IBM.Watson.Self.Agents
 
         public BlackBoard()
         {
+            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
+            TopicClient.Instance.ConnectedEvent += OnConnected;
             TopicClient.Instance.Subscribe( "blackboard", OnBlackBoardEvent );
         }
 
         public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL )
         {
-            if (! m_SubscriberMap.ContainsKey( a_Type ) )
+            if (!m_SubscriberMap.ContainsKey(a_Type))
+            {
                 m_SubscriberMap[a_Type] = new List<Subscriber>();
+
+                Dictionary<string, object> subscribe = new Dictionary<string, object>();
+                subscribe["event"] = "subscribe_to_type";
+                subscribe["type"] = a_Type;
+                subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
+
+                TopicClient.Instance.Publish("blackboard", Json.Serialize(subscribe));
+            }
+
             m_SubscriberMap[a_Type].Add( new Subscriber( a_Callback, a_EventMask ) );
-
-            Dictionary<string,object> subscribe = new Dictionary<string, object>();
-            subscribe["event"] = "subscribe_to_type";
-            subscribe["type"] = a_Type;
-            subscribe["event_mask"] = (int)a_EventMask;
-
-            TopicClient.Instance.Publish( "blackboard", Json.Serialize( subscribe ) );
         }
+
         public void UnsubscribeFromType( string a_Type, OnThingEvent a_Callback = null )
         {
             if ( m_SubscriberMap.ContainsKey( a_Type ) )
@@ -92,13 +99,43 @@ namespace IBM.Watson.Self.Agents
                     m_SubscriberMap.Remove( a_Type );
             }
 
-            Dictionary<string,object> unsubscribe = new Dictionary<string, object>();
-            unsubscribe["event"] = "unsubscribe_from_type";
-            unsubscribe["type"] = a_Type;
+            // only remove if this was the last subscriber for the given type..
+            if (!m_SubscriberMap.ContainsKey(a_Type))
+            {
+                Dictionary<string, object> unsubscribe = new Dictionary<string, object>();
+                unsubscribe["event"] = "unsubscribe_from_type";
+                unsubscribe["type"] = a_Type;
 
-            TopicClient.Instance.Publish( "blackboard", Json.Serialize( unsubscribe ) );
+                TopicClient.Instance.Publish("blackboard", Json.Serialize(unsubscribe));
+            }
         }
         #endregion
+
+        #region Event Handlers
+        void OnConnected()
+        {
+            if (m_bDisconnected)
+            {
+                // restore our subscriptions..
+                foreach (var kv in m_SubscriberMap)
+                {
+                    string type = kv.Key;
+
+                    Dictionary<string, object> subscribe = new Dictionary<string, object>();
+                    subscribe["event"] = "subscribe_to_type";
+                    subscribe["type"] = type;
+                    subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
+
+                    TopicClient.Instance.Publish("blackboard", Json.Serialize(subscribe));
+                    Log.Status("BlackBoard", "Subscription to type {0} restored.", type );
+                }
+                m_bDisconnected = false;
+            }
+        }
+        void OnDisconnected()
+        {
+            m_bDisconnected = true;
+        }
 
         void OnBlackBoardEvent( TopicClient.Payload a_Payload )
         {
@@ -188,5 +225,6 @@ namespace IBM.Watson.Self.Agents
                 }
             }
         }
+        #endregion
     }
 }

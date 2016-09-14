@@ -31,24 +31,43 @@ namespace IBM.Watson.Self.Gestures
     {
         #region Private Data
         private Dictionary<string, IGesture> m_Gestures = new Dictionary<string, IGesture>();
+        private Dictionary<string, bool> m_Overrides = new Dictionary<string, bool>();
+        private bool m_bDisconnected = false;
         #endregion
 
         #region Public Interface
+        /// <summary>
+        /// Get the GestureManager singleton object.
+        /// </summary>
         public static GestureManager Instance { get { return Singleton<GestureManager>.Instance; } }
 
+        /// <summary>
+        /// Default constructor.
+        /// </summary>
         public GestureManager()
         {
+            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
+            TopicClient.Instance.ConnectedEvent += OnConnected;
             TopicClient.Instance.Subscribe( "gesture-manager", OnGestureManagerEvent );
         }
 
+        /// <summary>
+        /// Checks if a given IGesture objects ia already registered.
+        /// </summary>
+        /// <param name="a_Gesture">The IGestue object to check.</param>
+        /// <returns>True is returned if registered.</returns>
         public bool IsRegistered( IGesture a_Gesture )
         {
             return m_Gestures.ContainsKey( a_Gesture.GetGestureId() );
         }
 
-        // register a new gesture with self. If a_bOVerride is true, then any previous gesture with the same ID
-        // will be replaced by this new gesture. If false, then this gesture will be added alongside any existing gestures
-        // with the same ID.
+        /// <summary>
+        /// Register a new gesture with self. If a_bOVerride is true, then any previous gesture with the same ID
+        /// will be replaced by this new gesture. If false, then this gesture will be added alongside any existing gestures 
+        /// with the same ID.
+        /// </summary>
+        /// <param name="a_Gesture"></param>
+        /// <param name="a_bOverride"></param>
         public void AddGesture( IGesture a_Gesture, bool a_bOverride = true )
         {
             string gestureKey = a_Gesture.GetGestureId() + "/" + a_Gesture.GetInstanceId();
@@ -64,13 +83,17 @@ namespace IBM.Watson.Self.Gestures
 
                     TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
                     m_Gestures[gestureKey] = a_Gesture;
+                    m_Overrides[gestureKey] = a_bOverride;
 
                     Log.Status( "GestureManager", "Gesture {0} added.", gestureKey );
                 }
             }
         }
 
-        //! Remove the provided sensor from the remote self instance.
+        /// <summary>
+        /// Remove the provided gesture from the remote self instance. 
+        /// </summary>
+        /// <param name="a_Gesture"></param>
         public void RemoveGesture( IGesture a_Gesture )
         {
             string gestureKey = a_Gesture.GetGestureId() + "/" + a_Gesture.GetInstanceId();
@@ -79,6 +102,7 @@ namespace IBM.Watson.Self.Gestures
                 if ( a_Gesture.OnStop() )
                 {
                     m_Gestures.Remove(gestureKey);
+                    m_Overrides.Remove(gestureKey);
 
                     Dictionary<string,object> register = new Dictionary<string, object>();
                     register["event"] = "remove_gesture_proxy";
@@ -94,6 +118,32 @@ namespace IBM.Watson.Self.Gestures
         #endregion
 
         #region Callback Functions
+        void OnConnected()
+        {
+            if (m_bDisconnected)
+            {
+                // re-register all our gestures on reconnect.
+                foreach (var kv in m_Gestures)
+                {
+                    string gestureKey = kv.Key;
+                    IGesture gesture = kv.Value;
+
+                    Dictionary<string, object> register = new Dictionary<string, object>();
+                    register["event"] = "add_gesture_proxy";
+                    register["gestureId"] = gesture.GetGestureId();
+                    register["instanceId"] = gesture.GetInstanceId();
+                    register["override"] = m_Overrides[gestureKey];
+
+                    TopicClient.Instance.Publish("gesture-manager", Json.Serialize(register));
+                    Log.Status("GestureManager", "Gesture {0} restored.", gestureKey);
+                }
+                m_bDisconnected = false;
+            }
+        }
+        void OnDisconnected()
+        {
+            m_bDisconnected = true;
+        }
 
         //! Callback for sensor-manager topic.
         void OnGestureManagerEvent( TopicClient.Payload a_Payload )

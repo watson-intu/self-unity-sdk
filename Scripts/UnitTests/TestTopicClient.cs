@@ -34,7 +34,10 @@ namespace IBM.Watson.Self.UnitTests
         {
             TopicClient client = TopicClient.Instance;
 
-            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", null, OnConnected, OnDisconnected );
+            client.ConnectedEvent += OnConnected;
+            client.DisconnectedEvent += OnDisconnected;
+
+            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", null );
             while(! m_bQueryTested )
                 yield return null;
             while(! m_bSubscribeBinaryTested )
@@ -43,6 +46,9 @@ namespace IBM.Watson.Self.UnitTests
                 yield return null;
             while(! m_bSubFailedTested )
                 yield return null;
+
+            client.ConnectedEvent -= OnConnected;
+            client.DisconnectedEvent -= OnDisconnected;
 
             yield break;
         }

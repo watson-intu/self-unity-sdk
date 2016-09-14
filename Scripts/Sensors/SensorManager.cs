@@ -26,12 +26,16 @@ using MiniJSON;
 
 namespace IBM.Watson.Self.Sensors
 {
-    //! This sensor manager allows the user to register/unregister sensors with the remote
-    //! self instance through the TopicClient.
+    /// <summary>
+    /// This sensor manager allows the user to register/unregister sensors with the remote
+    /// self instance through the TopicClient.
+    /// </summary>
     public class SensorManager
     {
         #region Private Data
-        Dictionary<string, ISensor >    m_Sensors = new Dictionary<string, ISensor>();
+        Dictionary<string, ISensor > m_Sensors = new Dictionary<string, ISensor>();
+        Dictionary<string, bool> m_Overrides = new Dictionary<string, bool>();
+        bool m_bDisconnected = false;
         #endregion
 
         #region Public Interface
@@ -39,6 +43,8 @@ namespace IBM.Watson.Self.Sensors
 
         public SensorManager()
         {
+            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
+            TopicClient.Instance.ConnectedEvent += OnConnected;
             TopicClient.Instance.Subscribe( "sensor-manager", OnSensorManagerEvent );
         }
 
@@ -67,6 +73,7 @@ namespace IBM.Watson.Self.Sensors
 
                 TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
                 m_Sensors[ a_Sensor.GetSensorId() ] = a_Sensor;
+                m_Overrides[a_Sensor.GetSensorId()] = a_bOverride;
 
                 Log.Status( "SensorManager", "Sensor {0} added.", a_Sensor.GetSensorId() );
             }
@@ -86,6 +93,7 @@ namespace IBM.Watson.Self.Sensors
             if ( m_Sensors.ContainsKey( a_Sensor.GetSensorId() ) )
             {
                 m_Sensors.Remove( a_Sensor.GetSensorId() );
+                m_Overrides.Remove(a_Sensor.GetSensorId());
 
                 Dictionary<string,object> register = new Dictionary<string, object>();
                 register["event"] = "remove_sensor_proxy";
@@ -99,6 +107,35 @@ namespace IBM.Watson.Self.Sensors
         #endregion
 
         #region Callback Functions
+        void OnConnected()
+        {
+            if (m_bDisconnected)
+            {
+                // re-register all our sensors on reconnect.
+                foreach (var kv in m_Sensors)
+                {
+                    string sensorId = kv.Key;
+                    ISensor sensor = kv.Value;
+
+                    Dictionary<string, object> register = new Dictionary<string, object>();
+                    register["event"] = "add_sensor_proxy";
+                    register["sensorId"] = sensor.GetSensorId();
+                    register["name"] = sensor.GetSensorName();
+                    register["data_type"] = sensor.GetDataType();
+                    register["binary_type"] = sensor.GetBinaryType();
+                    register["override"] = m_Overrides[sensorId];
+
+                    TopicClient.Instance.Publish("sensor-manager", Json.Serialize(register));
+                    Log.Status("SensorManager", "Sensor {0} restored.", sensor.GetSensorId());
+                }
+                m_bDisconnected = false;
+            }
+        }
+        void OnDisconnected()
+        {
+            m_bDisconnected = true;
+        }
+
         //! Callback for sensor-manager topic.
         void OnSensorManagerEvent( TopicClient.Payload a_Payload )
         {
