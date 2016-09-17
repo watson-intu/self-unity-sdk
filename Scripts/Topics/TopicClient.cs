@@ -100,7 +100,7 @@ namespace IBM.Watson.Self.Topics
         #endregion
 
         #region Constants
-        const float     RECONNECT_INTERVAL = 5.0F;
+        const float     RECONNECT_INTERVAL = 5.0f;
         #endregion
 
         #region Private Data
@@ -127,6 +127,7 @@ namespace IBM.Watson.Self.Topics
 
         #region Public Interface
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
+        public bool IsActive { get { return m_ReconnectRoutine >= 0; } }
         public ClientState State { get { return m_eState; } }
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
@@ -144,19 +145,27 @@ namespace IBM.Watson.Self.Topics
             m_MessageHandlers["query_response"] = HandleQueryResponse;
         }
 
-        public bool Connect( string a_Host,
-            string a_GroupId,
+        public bool Connect( string a_Host = null,
+            string a_GroupId = null,
             string a_selfId = null )
         {
+            if (string.IsNullOrEmpty(a_Host))
+                a_Host = Config.Instance.GetVariableValue("Host");
+            if (string.IsNullOrEmpty(a_Host))
+                a_Host = "ws://127.0.0.1:9494";
+            if (string.IsNullOrEmpty(a_GroupId))
+                a_GroupId = Config.Instance.GetVariableValue("GroupID");
+            if (string.IsNullOrEmpty(a_selfId))
+                a_selfId = Config.Instance.GetVariableValue("SelfID");
+            if (string.IsNullOrEmpty(a_selfId))
+                a_selfId = Utility.MacAddress;
+
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
             {
                 Log.Error( "TopicClient", "Host doesn't begin with ws:// or wss://" );
                 return false;
             }
-
-            if ( string.IsNullOrEmpty( a_selfId ) )
-                a_selfId = Utility.MacAddress;
 
             m_Host = a_Host;
             m_eState = ClientState.Connecting;
