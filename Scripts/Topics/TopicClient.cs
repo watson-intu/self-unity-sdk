@@ -114,8 +114,8 @@ namespace IBM.Watson.Self.Topics
         List<IDictionary>    
                         m_SendQueue = new List<IDictionary>();
         int             m_ReqId = 1;
-        Dictionary<int,OnQueryResponse> 
-                        m_QueryRequestMap = new Dictionary<int, OnQueryResponse>();
+        Dictionary<string,OnQueryResponse> 
+                        m_QueryRequestMap = new Dictionary<string, OnQueryResponse>();
         Dictionary<string,MessageHandler>
                         m_MessageHandlers = new Dictionary<string, MessageHandler>();
         Dictionary<string, List<Subscription> >
@@ -123,6 +123,8 @@ namespace IBM.Watson.Self.Topics
 
         int             m_PublishRoutine = -1;
         List<Payload>   m_PublishList = new List<Payload>();
+        int             m_MessageRoutine = -1;
+        List<IDictionary> m_Incoming = new List<IDictionary>();
         #endregion
 
         #region Public Interface
@@ -188,6 +190,8 @@ namespace IBM.Watson.Self.Topics
                 m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
             if ( m_PublishRoutine < 0 )
                 m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
+            if ( m_MessageRoutine < 0 )
+                m_MessageRoutine = Runnable.Run( OnMessage() );
             return true;
         }
 
@@ -202,6 +206,11 @@ namespace IBM.Watson.Self.Topics
             {
                 Runnable.Stop( m_PublishRoutine );
                 m_PublishRoutine = -1;
+            }
+            if ( m_MessageRoutine >= 0 )
+            {
+                Runnable.Stop( m_MessageRoutine );
+                m_MessageRoutine = -1;
             }
 
             if ( m_Socket != null )
@@ -246,9 +255,9 @@ namespace IBM.Watson.Self.Topics
 
         //! This queries a node specified by the given path.
         public void Query(string a_Path,               //! the path to the node, we will invoke the callback with a QueryInfo structure
-            OnQueryResponse a_Callback)
+            OnQueryResponse a_Callback, float a_fTimeout = 10.0f )
         {
-            int reqId = m_ReqId++;
+            string reqId = string.Format( "{0}", m_ReqId++ );
             m_QueryRequestMap[ reqId ] = a_Callback;
 
             Dictionary<string, object> query = new Dictionary<string, object>();
@@ -257,6 +266,8 @@ namespace IBM.Watson.Self.Topics
             query["request"] = reqId;
 
             SendMessage( query );
+
+            Runnable.Run( QueryTimeout( reqId, a_fTimeout ) );
         }
 
         //! Subscribe to the given topic specified by the provided path.
@@ -350,32 +361,8 @@ namespace IBM.Watson.Self.Topics
             else if ( message.IsText )
                 json = Json.Deserialize( message.Data ) as IDictionary;
 
-            if (json.Contains("control"))
-            {
-                string control = json["control"] as string;
-                if (control == "authenticate")
-                {
-                    string groupId = json["groupId"] as string;
-                    string selfId = json["selfId"] as string;
-
-                    Log.Status("TopicClient", "Received authenicate control, groupId: {0}, selfId: {1}", groupId, selfId);
-                    // TODO actually authenticate the other end?
-                    m_ParentId = selfId;
-                }
-
-            }
-            else if (json.Contains("msg"))
-            {
-                string msg = json["msg"] as string;
-
-                MessageHandler handler = null;
-                if (m_MessageHandlers.TryGetValue(msg, out handler))
-                    handler(json);
-                else
-                    Log.Debug("TopicClient", "Received unhandled message {0}", msg);
-            }
-            else
-                Log.Error("TopicClient", "Unknown message type received: {0}", Json.Serialize(json));
+            lock( m_Incoming )
+                m_Incoming.Add( json );
         }
 
         void OnSocketOpen(object sender, EventArgs e)
@@ -463,10 +450,73 @@ namespace IBM.Watson.Self.Topics
                 yield return null;
             }
         }
+        IEnumerator OnMessage()
+        {
+            yield return null;
+
+            while( m_Socket != null )
+            {
+                lock(m_Incoming)
+                {
+                    for(int i=0;i<m_Incoming.Count;++i)
+                    {
+                        IDictionary json = m_Incoming[i];
+                        if (json.Contains("control"))
+                        {
+                            string control = json["control"] as string;
+                            if (control == "authenticate")
+                            {
+                                string groupId = json["groupId"] as string;
+                                string selfId = json["selfId"] as string;
+
+                                Log.Status("TopicClient", "Received authenicate control, groupId: {0}, selfId: {1}", groupId, selfId);
+                                // TODO actually authenticate the other end?
+                                m_ParentId = selfId;
+                            }
+
+                        }
+                        else if (json.Contains("msg"))
+                        {
+                            string msg = json["msg"] as string;
+
+                            MessageHandler handler = null;
+                            if (m_MessageHandlers.TryGetValue(msg, out handler))
+                                handler(json);
+                            else
+                                Log.Debug("TopicClient", "Received unhandled message {0}", msg);
+                        }
+                        else
+                            Log.Error("TopicClient", "Unknown message type received: {0}", Json.Serialize(json));
+                    }
+
+                    m_Incoming.Clear();
+                }
+
+                yield return null;
+            }
+        }
 
         #endregion
 
         #region Private Functions
+        private IEnumerator QueryTimeout( string reqId, float a_fTimeout )
+        {
+            DateTime start = DateTime.Now;
+            while( (DateTime.Now - start).TotalSeconds < a_fTimeout )
+                yield return null;
+
+            OnQueryResponse callback;
+            if ( m_QueryRequestMap.TryGetValue( reqId, out callback ) )
+            {
+                Log.Warning( "TopicClient", "Query request {0} timed out.", reqId );
+                callback( null );
+
+                m_QueryRequestMap.Remove( reqId );
+            }
+            yield break;
+        }
+
+
         void SendMessage( IDictionary a_message )
         {
             if ( m_Socket != null && m_eState == ClientState.Connected )
@@ -534,8 +584,22 @@ namespace IBM.Watson.Self.Topics
 
         void HandleNoRoute(IDictionary a_Message)
         {
+            string failed_msg = (string)a_Message["failed_msg"];
             string origin = (string)a_Message["origin"];
-            Log.Warning( "TopicClient", "Failed to send message to {0}", origin );
+
+            Log.Warning( "TopicClient", "Failed to send message {1} to {0}", origin, failed_msg );
+
+            if ( failed_msg == "query" )
+            {
+                string reqId = (string)a_Message["request"];
+
+                OnQueryResponse callback = null;
+                if ( m_QueryRequestMap.TryGetValue( reqId, out callback ) )
+                {
+                    callback( null );
+                    m_QueryRequestMap.Remove( reqId );
+                }
+            }
         }
         void HandleQuery(IDictionary a_Message)
         {
@@ -606,10 +670,14 @@ namespace IBM.Watson.Self.Topics
                 }
             }
 
-            int reqId = int.Parse( (string)a_Message["request"] ); 
+            string reqId = (string)a_Message["request"];
+
             OnQueryResponse callback = null;
             if ( m_QueryRequestMap.TryGetValue( reqId, out callback ) )
+            {
                 callback( info );
+                m_QueryRequestMap.Remove( reqId );
+            }
         }
         #endregion
     }
