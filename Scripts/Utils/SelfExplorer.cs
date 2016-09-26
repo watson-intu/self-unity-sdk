@@ -100,32 +100,35 @@ namespace IBM.Watson.Self.Utils
                         Parent = null;
                     }
 
-                    foreach( string childId in m_Info.Children )
+                    if ( m_Info.Children != null )
                     {
-                        if ( childId == m_Source || childId == SelfId )
-                            continue;           // skip our source
+                        foreach( string childId in m_Info.Children )
+                        {
+                            if ( childId == m_Source || childId == SelfId )
+                                continue;           // skip our source
 
-                        // look for an existing node first..
-                        Node child = null;
-                        foreach( Node node in m_Children )
-                            if ( node.SelfId == childId )
+                            // look for an existing node first..
+                            Node child = null;
+                            foreach( Node node in m_Children )
+                                if ( node.SelfId == childId )
+                                {
+                                    child = node;
+                                    break;
+                                }
+
+                            if ( child == null )
                             {
-                                child = node;
-                                break;
+                                // no existing node found, create one..
+                                child = new Node(m_Explorer);
+                                m_Children.Add( child );
+
+                                if ( m_Explorer.OnNodeAdded != null )
+                                    m_Explorer.OnNodeAdded( child );
                             }
 
-                        if ( child == null )
-                        {
-                            // no existing node found, create one..
-                            child = new Node(m_Explorer);
-                            m_Children.Add( child );
-
-                            if ( m_Explorer.OnNodeAdded != null )
-                                m_Explorer.OnNodeAdded( child );
+                            // refresh the child node..
+                            child.Refresh( m_Path + childId + "/", SelfId );
                         }
-
-                        // refresh the child node..
-                        child.Refresh( m_Path + childId + "/", SelfId );
                     }
 
                     // remove children..
@@ -133,12 +136,15 @@ namespace IBM.Watson.Self.Utils
                     foreach( Node child in m_Children )
                     {
                         bool bFoundChild = false;
-                        foreach( string childId in m_Info.Children )
-                            if ( childId == child.SelfId )
-                            {
-                                bFoundChild = true;
-                                break;
-                            }
+                        if ( m_Info.Children != null )
+                        {
+                            foreach( string childId in m_Info.Children )
+                                if ( childId == child.SelfId )
+                                {
+                                    bFoundChild = true;
+                                    break;
+                                }
+                        }
 
                         if (! bFoundChild )
                         {
