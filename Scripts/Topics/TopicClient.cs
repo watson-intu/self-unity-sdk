@@ -549,7 +549,7 @@ namespace IBM.Watson.Self.Topics
         #region Message Handlers
         void HandlePublish(IDictionary a_Message)
         {
-            Log.Debug( "TopicClient", "HandlePublish()" );   
+            //Log.Debug( "TopicClient", "HandlePublish()" );   
 
             string path = OriginToPath( GetPath( (string)a_Message["origin"], (string)a_Message["topic"] ) );
             Payload payload = new Payload();

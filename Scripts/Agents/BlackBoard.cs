@@ -180,23 +180,31 @@ namespace IBM.Watson.Self.Agents
                     m_ThingMap.Remove( guid );
                 }
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
+                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
             }
             else if ( event_name == "set_object_state" )
             {
                 string guid = json["thing_guid"] as string;
                 if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
+                {
+                    string state = json["state"] as string;
+                    Log.Status( "BlackBoard", "Updating object {0} state to {1}", guid, state );
                     te.m_Thing.State = json["state"] as string;
+                }
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
+                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
             }
             else if ( event_name == "set_object_importance" )
             {
                 string guid = json["thing_guid"] as string;
                 if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
-                    te.m_Thing.Importance = (float)json["importance"];
+                {
+                    float fImportance = (float)json["importance"];
+                    Log.Status( "BlackBoard", "Updating object {0} importance to {1}", guid, fImportance );
+                    te.m_Thing.Importance = fImportance;
+                }
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid." );
+                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
             }
 
             // if we failed, send the message back with a different event
