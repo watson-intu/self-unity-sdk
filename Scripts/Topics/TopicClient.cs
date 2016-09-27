@@ -23,6 +23,8 @@ using IBM.Watson.DeveloperCloud.Logging;
 using IBM.Watson.DeveloperCloud.Utilities;
 using MiniJSON;
 using WebSocketSharp;
+using IBM.Watson.DeveloperCloud.Connection;
+using IBM.Watson.Self.Services;
 
 namespace IBM.Watson.Self.Topics
 {
@@ -125,11 +127,12 @@ namespace IBM.Watson.Self.Topics
         List<Payload>   m_PublishList = new List<Payload>();
         int             m_MessageRoutine = -1;
         List<IDictionary> m_Incoming = new List<IDictionary>();
+        RobotGateway    m_Gateway = new RobotGateway();
         #endregion
 
         #region Public Interface
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
-        public bool IsActive { get { return m_ReconnectRoutine >= 0; } }
+        public bool IsActive { get { return m_eState != ClientState.Inactive && m_eState != ClientState.Disconnected; } }
         public ClientState State { get { return m_eState; } }
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
@@ -151,16 +154,21 @@ namespace IBM.Watson.Self.Topics
             string a_GroupId = null,
             string a_selfId = null )
         {
+            if ( m_eState != ClientState.Inactive 
+                && m_eState != ClientState.Disconnected )
+            {
+                Log.Error( "TopicClient", "Client is wrong state for Connect()." );
+                return false;
+            }
+
             if (string.IsNullOrEmpty(a_Host))
                 a_Host = Config.Instance.GetVariableValue("Host");
             if (string.IsNullOrEmpty(a_Host))
-                a_Host = "ws://127.0.0.1:9494";
+                a_Host = "ws://127.0.0.1:9443";
             if (string.IsNullOrEmpty(a_GroupId))
                 a_GroupId = Config.Instance.GetVariableValue("GroupID");
             if (string.IsNullOrEmpty(a_selfId))
                 a_selfId = Config.Instance.GetVariableValue("SelfID");
-            if (string.IsNullOrEmpty(a_selfId))
-                a_selfId = Utility.MacAddress;
 
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
@@ -172,11 +180,31 @@ namespace IBM.Watson.Self.Topics
             m_Host = a_Host;
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
-            m_SelfId = a_selfId;
 
+            if (string.IsNullOrEmpty(a_selfId))
+            {
+                if ( RegisterEmbodiment() )
+                {
+                    Log.Status( "TopicClient", "Registering embodiment." );
+                    return true;
+                }
+
+                Log.Error( "TopicClient", "Failed to register embodiment." );
+                m_eState = ClientState.Inactive;
+                return false;
+            }
+
+            m_SelfId = a_selfId;
+            DoConnect();
+
+            return true;
+        }
+
+        private void DoConnect()
+        {
             m_Socket = new WebSocket( new Uri( new Uri( m_Host ), "/stream").AbsoluteUri );
             m_Socket.Headers = new Dictionary<string, string>();
-            m_Socket.Headers.Add("groupId", a_GroupId );
+            m_Socket.Headers.Add("groupId", m_GroupId );
             m_Socket.Headers.Add("selfId", m_SelfId );
 
             m_Socket.OnMessage += OnSocketMessage;
@@ -192,9 +220,61 @@ namespace IBM.Watson.Self.Topics
                 m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
             if ( m_MessageRoutine < 0 )
                 m_MessageRoutine = Runnable.Run( OnMessage() );
-            return true;
         }
 
+        private bool RegisterEmbodiment()
+        {
+            string groupId = Config.Instance.GetVariableValue( "GroupID" );
+            if ( string.IsNullOrEmpty( groupId ) )
+            {
+                Log.Error( "TopicClient", "GroupID is null or empty." );
+                return false;
+            }
+            string orgId = Config.Instance.GetVariableValue( "OrgID" );
+            if ( string.IsNullOrEmpty( orgId ) )
+            {
+                Log.Error( "TopicClient", "OrgID is null or empty." );
+                return false;
+            }
+
+            string bearerToken = Config.Instance.GetVariableValue("BearerToken");
+            if ( string.IsNullOrEmpty( bearerToken ) )
+            {
+                Log.Error( "TopicClient", "BearerToken is null or empty." );
+                return false;
+            }
+
+            string name = Config.Instance.GetVariableValue("EmbodimentName");
+            if ( string.IsNullOrEmpty( name ) )
+                name = "TopicClient";
+            string type = Config.Instance.GetVariableValue("EmbodimentType");
+            if ( string.IsNullOrEmpty( type ) )
+                type = "TopicClient";
+
+            return m_Gateway.RegisterEmbodiment( groupId, orgId, bearerToken, name, type, OnRegisteredEmbodiment );
+        }
+
+        private void OnRegisteredEmbodiment( string a_Token, string a_EmbodimentId )
+        {
+            if (! string.IsNullOrEmpty( a_Token ) 
+                && !string.IsNullOrEmpty( a_EmbodimentId ) )
+            {
+                m_SelfId = a_EmbodimentId;
+
+                Config.Instance.SetVariableValue( "BearerToken", a_Token );
+                Config.Instance.SetVariableValue( "SelfID", m_SelfId, true );
+                Config.Instance.SaveConfig();
+
+                Log.Status( "TopicClient", "Embodiment Registered: {0}", m_SelfId );
+            }
+            else
+            {
+                Log.Error( "TopicClient", "Failed to register embodiment." );
+            }
+
+            DoConnect();
+        }
+ 
         public void Disconnect()
         {
             if ( m_ReconnectRoutine >= 0 )
@@ -217,7 +297,6 @@ namespace IBM.Watson.Self.Topics
             {
                 m_eState = ClientState.Closing;
                 m_Socket.CloseAsync();
-                m_Socket = null;
             }
         }
 
@@ -411,7 +490,7 @@ namespace IBM.Watson.Self.Topics
                     while( (DateTime.Now - start).TotalSeconds < RECONNECT_INTERVAL )
                         yield return null;
 
-                    Connect( m_Host, m_GroupId, m_SelfId );
+                    DoConnect();
                 }
                 else
                     yield return null;
