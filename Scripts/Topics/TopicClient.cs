@@ -25,6 +25,7 @@ using MiniJSON;
 using WebSocketSharp;
 using IBM.Watson.DeveloperCloud.Connection;
 using IBM.Watson.Self.Services;
+using IBM.Watson.Self.Utils;
 
 namespace IBM.Watson.Self.Topics
 {
@@ -127,7 +128,7 @@ namespace IBM.Watson.Self.Topics
         List<Payload>   m_PublishList = new List<Payload>();
         int             m_MessageRoutine = -1;
         List<IDictionary> m_Incoming = new List<IDictionary>();
-        RobotGateway    m_Gateway = new RobotGateway();
+        SelfLogin       m_Login = null;
         #endregion
 
         #region Public Interface
@@ -180,21 +181,21 @@ namespace IBM.Watson.Self.Topics
             m_Host = a_Host;
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
+            m_SelfId = a_selfId;
 
-            if (string.IsNullOrEmpty(a_selfId))
+            if (string.IsNullOrEmpty(m_SelfId))
             {
-                if ( RegisterEmbodiment() )
-                {
-                    Log.Status( "TopicClient", "Registering embodiment." );
-                    return true;
-                }
+                m_Login = new SelfLogin();
+                m_Login.OnRegisteredEvent += OnRegisteredEmbodiment;
+                m_Login.OnErrorEvent += OnRegisterError;
 
-                Log.Error( "TopicClient", "Failed to register embodiment." );
-                m_eState = ClientState.Inactive;
-                return false;
+                Log.Status( "TopicClient", "Registering embodiment." );
+                if (! m_Login.RegisterEmbodiment() )
+                    OnRegisterError();
+
+                return true;
             }
 
-            m_SelfId = a_selfId;
             DoConnect();
 
             return true;
@@ -222,55 +223,17 @@ namespace IBM.Watson.Self.Topics
                 m_MessageRoutine = Runnable.Run( OnMessage() );
         }
 
-        private bool RegisterEmbodiment()
+        private void OnRegisteredEmbodiment( string a_GroupId, string a_SelfId )
         {
-            string groupId = Config.Instance.GetVariableValue( "GroupID" );
-            if ( string.IsNullOrEmpty( groupId ) )
-            {
-                Log.Error( "TopicClient", "GroupID is null or empty." );
-                return false;
-            }
-            string orgId = Config.Instance.GetVariableValue( "OrgID" );
-            if ( string.IsNullOrEmpty( orgId ) )
-            {
-                Log.Error( "TopicClient", "OrgID is null or empty." );
-                return false;
-            }
+            m_SelfId = a_SelfId;
+            m_Login = null;
 
-            string bearerToken = Config.Instance.GetVariableValue("BearerToken");
-            if ( string.IsNullOrEmpty( bearerToken ) )
-            {
-                Log.Error( "TopicClient", "BearerToken is null or empty." );
-                return false;
-            }
-
-            string name = Config.Instance.GetVariableValue("EmbodimentName");
-            if ( string.IsNullOrEmpty( name ) )
-                name = "TopicClient";
-            string type = Config.Instance.GetVariableValue("EmbodimentType");
-            if ( string.IsNullOrEmpty( type ) )
-                type = "TopicClient";
-
-            return m_Gateway.RegisterEmbodiment( groupId, orgId, bearerToken, name, type, OnRegisteredEmbodiment );
+            DoConnect();
         }
-
-        private void OnRegisteredEmbodiment( string a_Token, string a_EmbodimentId )
+        private void OnRegisterError()
         {
-            if (! string.IsNullOrEmpty( a_Token ) 
-                && !string.IsNullOrEmpty( a_EmbodimentId ) )
-            {
-                m_SelfId = a_EmbodimentId;
-
-                Config.Instance.SetVariableValue( "BearerToken", a_Token );
-                Config.Instance.SetVariableValue( "SelfID", m_SelfId, true );
-                Config.Instance.SaveConfig();
-
-                Log.Status( "TopicClient", "Embodiment Registered: {0}", m_SelfId );
-            }
-            else
-            {
-                Log.Error( "TopicClient", "Failed to register embodiment." );
-            }
+            Log.Error( "TopicClient", "Failed to register embodiment." );
+            m_Login = null;
 
             DoConnect();
         }
@@ -462,7 +425,7 @@ namespace IBM.Watson.Self.Topics
         }
         void OnSocketClosed(object sender, CloseEventArgs e)
         {
-            Log.Status("TopicClient", "OnSocketClosed()" );
+            Log.Status("TopicClient", "OnSocketClosed: {0}", e.Reason );
 
             if ( m_eState != ClientState.Closing )
                 m_eState = ClientState.Disconnected;
