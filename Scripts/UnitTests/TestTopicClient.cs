@@ -37,7 +37,7 @@ namespace IBM.Watson.Self.UnitTests
             client.ConnectedEvent += OnConnected;
             client.DisconnectedEvent += OnDisconnected;
 
-            client.Connect( "ws://Test0929Parenta8db35f326196b738554ba23a0fc4793.mybluemix.net:80", "a8db35f326196b738554ba23a0fc5a60", "cf97ddfe62d1af5b295ce7f2616c5f7a" );
+            client.Connect( "ws://khanincparentc937325f062f667a7b5c0bef4343aec9.mybluemix.net:80", "7fa19c667cd4262dc7ea2bfc646d1db7", "95dc218b96fedd16aa7b68e452c95eec" );
             while(! m_bQueryTested )
                 yield return null;
             while(! m_bSubscribeBinaryTested )

@@ -87,7 +87,7 @@ namespace IBM.Watson.Self.Topics
 
             public override string ToString()
             {
-                return string.Format("[QueryInfo: bSuccess={0}, Path={1}, GroupId={2}, SelfId={3}, ParentId={4}, Name={5}, Type={6}, Version={7}, \nChildren={8}, \nTopics={9}]", bSuccess, Path, GroupId, SelfId, ParentId, Name, Type, Version, (Children != null)? string.Join(",", Children) : "-" ,  (Topics != null)? string.Join(",", Array.ConvertAll<TopicInfo, string>(Topics, Convert.ToString)) : "-");
+                return string.Format("[QueryInfo: bSuccess={0}, Path={1}, GroupId={2}, SelfId={3}, ParentId={4}, Name={5}, Type={6}, Version={7}, \nChildren={8}, \nTopics={9}]", bSuccess, Path, GroupId, SelfId, ParentId, Name, Type, Version, (Children != null)? string.Join(",", Children) : "-" ,  (Topics != null)? string.Join(", \n", Array.ConvertAll<TopicInfo, string>(Topics, Convert.ToString)) : "-");
             }
         };
         public delegate void OnQueryResponse(QueryInfo a_Info);

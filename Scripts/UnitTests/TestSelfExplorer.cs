@@ -32,7 +32,8 @@ namespace IBM.Watson.Self.UnitTests
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
-            client.Connect();
+            //client.Connect();
+            client.Connect( "ws://khanincparentc937325f062f667a7b5c0bef4343aec9.mybluemix.net", "7fa19c667cd4262dc7ea2bfc646d1db7", "95dc218b96fedd16aa7b68e452c95eec" );
 
             m_Explorer.OnNodeAdded += OnNodeAdded;
             m_Explorer.OnNodeRemoved += OnNodeRemoved;
@@ -44,25 +45,30 @@ namespace IBM.Watson.Self.UnitTests
             while(! m_bExplorerTested )
                 yield return null;
 
+            m_bExplorerTested = false;
+            m_Explorer.Explore();
+           
+            while(! m_bExplorerTested )
+                yield return null;
+            
             yield break;
         }
 
         private void OnNodeAdded( SelfExplorer.Node a_Added )
         {
-            //Log.Debug( "TestSelfExplorer", "OnNodeAdded" );
+            Log.Debug( "TestSelfExplorer", "OnNodeAdded: {0}", a_Added );
         }
         private void OnNodeRemoved( SelfExplorer.Node a_Added )
         {
-            Log.Debug( "TestSelfExplorer", "OnNodeRemoved, selfId = {0}", a_Added.SelfId );
+            Log.Debug( "TestSelfExplorer", "OnNodeRemoved: {0}", a_Added );
         }
         private void OnNodeReady( SelfExplorer.Node a_Node )
         {
-            Log.Debug( "TestSelfExplorer", "OnNodeReady, path = {0}, groupId = {1}, selfId = {2}, parentId = {3}",
-                a_Node.Path, a_Node.GroupId, a_Node.SelfId, a_Node.ParentId );
+            Log.Debug( "TestSelfExplorer", "OnNodeReady: {0}", a_Node);
         }
         private void OnExploreDone( SelfExplorer a_Explorer )
         {
-            Log.Debug( "TestSelfExplorer", "OnExploreDone" );
+            Log.Debug( "TestSelfExplorer", "OnExploreDone: {0}", a_Explorer );
             m_bExplorerTested = true;
         }
     }

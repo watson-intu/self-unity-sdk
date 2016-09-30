@@ -88,6 +88,8 @@ namespace IBM.Watson.Self.Utils
                 m_Explorer.m_PendingRequests -= 1;
                 m_Info = a_Info;
 
+                Log.Debug( "SelfExplorer", "OnQueryResponse {0} . Source: {1}, SelfId: {2}", a_Info, m_Source, SelfId);
+
                 if ( m_Info != null )
                 {
                     if (! string.IsNullOrEmpty( m_Info.ParentId ) )
@@ -99,6 +101,8 @@ namespace IBM.Watson.Self.Utils
                                 Parent = new Node(m_Explorer);
                                 Parent.Children.Add( this );
                         
+                                Log.Debug( "SelfExplorer", "New child added from Parent {0} - \nQuery: {1}", Parent, m_Info );
+
                                 if ( m_Explorer.OnNodeAdded != null )
                                     m_Explorer.OnNodeAdded( Parent );
 
@@ -110,7 +114,7 @@ namespace IBM.Watson.Self.Utils
                     }
                     else if ( Parent != null )
                     {
-                        //Log.Debug( "SelfExplorer", "Parent {0} is gone.", Parent.SelfId );
+                        Log.Debug( "SelfExplorer", "Parent is gone : {0}", Parent );
                         if ( m_Explorer.OnNodeRemoved != null )
                             m_Explorer.OnNodeRemoved( Parent );
 
@@ -121,8 +125,10 @@ namespace IBM.Watson.Self.Utils
                     {
                         foreach( string childId in m_Info.Children )
                         {
-                            if ( childId == m_Source || childId == SelfId )
+                            if ( childId == m_Source || childId == SelfId ){
+                                Log.Debug( "SelfExplorer", "Skippig New Child check. Is Source:  {0} - Is Me: {1}, child: {2}, source: {3}, selfId: {4}", (childId == m_Source), (childId == SelfId), childId, m_Source, SelfId );
                                 continue;           // skip our source
+                            }
 
                             // look for an existing node first..
                             Node child = null;
@@ -135,9 +141,15 @@ namespace IBM.Watson.Self.Utils
 
                             if ( child == null )
                             {
+                                
                                 // no existing node found, create one..
                                 child = new Node(m_Explorer);
+                                //TODO: This child doesn't contain any data! We may assign SelfId to fill all the information after query. 
+                                //child.m_Info = new TopicClient.QueryInfo();
+                                //child.m_Info.SelfId = childId;
+
                                 m_Children.Add( child );
+                                Log.Debug( "SelfExplorer", "New child added {0} - \nQuery: {1}", child, m_Info );
 
                                 if ( m_Explorer.OnNodeAdded != null )
                                     m_Explorer.OnNodeAdded( child );
@@ -165,7 +177,7 @@ namespace IBM.Watson.Self.Utils
 
                         if (! bFoundChild )
                         {
-                            //Log.Debug( "SelfExplorer", "Removing child {0}", child.SelfId );
+                            Log.Debug( "SelfExplorer", "Removing child {0} - \nQuery: {1}", child, m_Info );
                             if ( m_Explorer.OnNodeRemoved != null )
                                 m_Explorer.OnNodeRemoved( child );
                             remove.Add( child );
@@ -217,7 +229,7 @@ namespace IBM.Watson.Self.Utils
 
         public override string ToString()
         {
-            return string.Format("[SelfExplorer: PendingRequests={0}, Root={1}, OnNodeReady={2}, OnNodeAdded={3}, OnNodeRemoved={4}, OnExplorerDone={5}]", PendingRequests, Root, OnNodeReady, OnNodeAdded, OnNodeRemoved, OnExplorerDone);
+            return string.Format("[SelfExplorer: PendingRequests={0}, Root={1}]", PendingRequests, Root);
         }
         #endregion
     }
