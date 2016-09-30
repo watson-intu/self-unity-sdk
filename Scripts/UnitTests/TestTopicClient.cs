@@ -37,7 +37,7 @@ namespace IBM.Watson.Self.UnitTests
             client.ConnectedEvent += OnConnected;
             client.DisconnectedEvent += OnDisconnected;
 
-            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf", null );
+            client.Connect( "ws://Test0929Parenta8db35f326196b738554ba23a0fc4793.mybluemix.net:80", "a8db35f326196b738554ba23a0fc5a60", "cf97ddfe62d1af5b295ce7f2616c5f7a" );
             while(! m_bQueryTested )
                 yield return null;
             while(! m_bSubscribeBinaryTested )
@@ -66,7 +66,7 @@ namespace IBM.Watson.Self.UnitTests
 
         private void OnQuery( TopicClient.QueryInfo a_Query )
         {
-            Log.Debug( "TopicClient", "OnQuery()" );
+            Log.Debug( "TopicClient", "OnQuery(). QueryResponse: {0}", a_Query );
             m_bQueryTested = true;
 
             TopicClient.Instance.Subscribe( "sensor-Microphone", OnMicrophoneData );

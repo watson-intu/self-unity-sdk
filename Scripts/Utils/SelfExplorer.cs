@@ -65,7 +65,7 @@ namespace IBM.Watson.Self.Utils
                 m_bError = false;
 
                 m_Explorer.m_PendingRequests += 1;
-                Log.Debug( "SelfExplorer", "Query: {0}", m_Path );
+                Log.Debug( "SelfExplorer", "Refresh. Path: {0}, Source: {1}", m_Path, a_Source );
                 TopicClient.Instance.Query( m_Path, OnQueryResponse );
             }
 
@@ -186,6 +186,13 @@ namespace IBM.Watson.Self.Utils
                 if ( m_Explorer.m_PendingRequests == 0 && m_Explorer.OnExplorerDone != null )
                     m_Explorer.OnExplorerDone( m_Explorer );
             }
+
+            public override string ToString()
+            {
+                return string.Format("[Node: IsReady={0}, IsError={1}, Parent={2}, Children Count={3}, Path={4}, Info={5}, GroupId={6}, SelfId={7}, ParentId={8}]", IsReady, IsError, Parent, (Children != null)? Children.Count.ToString() : " - ", Path, Info, GroupId, SelfId, ParentId);
+            }
+
+
         }
         public delegate void OnNode( Node a_Node );
         public delegate void OnDone( SelfExplorer a_Explorer );
@@ -206,6 +213,11 @@ namespace IBM.Watson.Self.Utils
         {
             Root = new Node(this);
             Root.Refresh( a_StartTarget, TopicClient.Instance.SelfId );
+        }
+
+        public override string ToString()
+        {
+            return string.Format("[SelfExplorer: PendingRequests={0}, Root={1}, OnNodeReady={2}, OnNodeAdded={3}, OnNodeRemoved={4}, OnExplorerDone={5}]", PendingRequests, Root, OnNodeReady, OnNodeAdded, OnNodeRemoved, OnExplorerDone);
         }
         #endregion
     }
