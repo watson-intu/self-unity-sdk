@@ -29,11 +29,14 @@ namespace IBM.Watson.Self.UnitTests
         bool m_bExplorerTested = false;
         SelfExplorer m_Explorer = new SelfExplorer();
 
+        string m_Host = "ws://toolingllcparent06018d201ef936fe58e80dd623db7866.mybluemix.net:80";
+        string m_GroupId = "c631a39d87ec8f87155e7b91238e9826";
+        string m_SelfId = "22071b9763dcc3fbb14aed7fc3884d3f";
+
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
-            //client.Connect();
-            client.Connect( "ws://khanincparentc937325f062f667a7b5c0bef4343aec9.mybluemix.net", "7fa19c667cd4262dc7ea2bfc646d1db7", "95dc218b96fedd16aa7b68e452c95eec" );
+            client.Connect( m_Host, m_GroupId, m_SelfId);
 
             m_Explorer.OnNodeAdded += OnNodeAdded;
             m_Explorer.OnNodeRemoved += OnNodeRemoved;

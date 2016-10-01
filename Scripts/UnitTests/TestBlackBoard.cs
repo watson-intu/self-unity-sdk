@@ -25,38 +25,61 @@ namespace IBM.Watson.Self.UnitTests
 {
     public class TestBlackBoard : UnitTest
     {
+
+        string m_Host = "ws://192.168.1.9:9443";
+        string m_GroupId = "e664f5dd5c108e01b140180b50f4eafe";
+        string m_SelfId = "aecea8a8afa3d8f224c12576512c7e0f";
+        string m_TargetPath = "";
+            
         bool m_bSubscribeTested = false;
+        bool m_ConnectionClosed = false;
+
+        TopicClient client = null;
 
         public override IEnumerator RunTest()
         {
-            TopicClient client = TopicClient.Instance;
+            client = TopicClient.Instance;
 
             client.ConnectedEvent += OnConnected;
             client.DisconnectedEvent += OnDisconnected;
 
-            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf" );
+            client.Connect( m_Host, m_GroupId, m_SelfId);
+
             while(! m_bSubscribeTested )
                 yield return null;
 
-            client.ConnectedEvent -= OnConnected;
-            client.DisconnectedEvent -= OnDisconnected;
-
+            Log.Debug( "TestBlackBoard", "Tested Subscription now disconnecting" );
+            client.Disconnect();
+                
+            while(! m_ConnectionClosed )
+                yield return null;
+            
             yield break;
         }
 
         private void OnConnected()
         {
             Log.Debug( "TestBlackBoard", "OnConnected" );
+            client.Target = m_TargetPath;
             BlackBoard.Instance.SubscribeToType( "Text", OnText );
+            m_ConnectionClosed = false;
         }
 
         private void OnDisconnected()
         {
             Log.Debug( "TestBlackBoard", "OnDisconnected" );
+
+            if (m_bSubscribeTested)
+            {
+                client.ConnectedEvent -= OnConnected;
+                client.DisconnectedEvent -= OnDisconnected;
+            }
+            m_ConnectionClosed = true;
         }
 
         private void OnText( ThingEvent a_Event )
         {
+            Log.Debug( "TestBlackBoard", "OnText : {0}", a_Event );
             m_bSubscribeTested = true;
 
         }
