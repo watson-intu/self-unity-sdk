@@ -36,6 +36,13 @@ namespace IBM.Watson.Self.UnitTests
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
+            if ( client.IsActive )
+            {
+                client.Disconnect();
+                while( client.IsActive ) 
+                    yield return null;
+            }
+
             client.Connect( m_Host, m_GroupId, m_SelfId);
 
             m_Explorer.OnNodeAdded += OnNodeAdded;
