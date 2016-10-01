@@ -121,6 +121,7 @@ namespace IBM.Watson.Self.Topics
         string          m_Host = null;
         string          m_GroupId = null;
         string          m_SelfId = null;
+        bool            m_bAuthenticated = false;
         string          m_ParentId = null;
         WebSocket       m_Socket = null;
         ClientState     m_eState = ClientState.Inactive;
@@ -148,6 +149,7 @@ namespace IBM.Watson.Self.Topics
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
         public string Target { get; set; }
+        public bool Authenticated { get { return m_bAuthenticated; } }
 
         public OnConnected ConnectedEvent { get; set; }
         public OnDisconnected DisconnectedEvent { get; set; }
@@ -192,6 +194,7 @@ namespace IBM.Watson.Self.Topics
             m_eState = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = a_selfId;
+            m_bAuthenticated = false;
 
             if (string.IsNullOrEmpty(m_SelfId))
             {
@@ -524,6 +527,7 @@ namespace IBM.Watson.Self.Topics
                                 Log.Status("TopicClient", "Received authenicate control, groupId: {0}, selfId: {1}", groupId, selfId);
                                 // TODO actually authenticate the other end?
                                 m_ParentId = selfId;
+                                m_bAuthenticated = true;
                             }
 
                         }
