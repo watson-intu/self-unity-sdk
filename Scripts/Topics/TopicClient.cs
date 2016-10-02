@@ -141,13 +141,10 @@ namespace IBM.Watson.Self.Topics
         Dictionary<string, List<Subscription> >
                         m_SubscriptionMap = new Dictionary<string, List<Subscription>>();
 
-        int             m_PublishRoutine = -1;
+        int             m_MessageAndPublishRoutine = -1;
         List<Payload>   m_PublishList = new List<Payload>();
-        int             m_MessageRoutine = -1;
         List<IDictionary> m_Incoming = new List<IDictionary>();
         SelfLogin       m_Login = null;
-
-        int             m_StateChangeRoutine = -1;
         #endregion
 
         #region Public Interface
@@ -239,12 +236,8 @@ namespace IBM.Watson.Self.Topics
 
             if ( m_ReconnectRoutine < 0 )
                 m_ReconnectRoutine = Runnable.Run( OnReconnect() );      // start the OnReconnect co-routine to keep us connected
-            if ( m_PublishRoutine < 0 )
-                m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
-            if ( m_MessageRoutine < 0 )
-                m_MessageRoutine = Runnable.Run( OnMessage() );
-            if (m_StateChangeRoutine < 0)
-                m_StateChangeRoutine = Runnable.Run( OnStateChange() );
+            if ( m_MessageAndPublishRoutine < 0 )
+                m_MessageAndPublishRoutine = Runnable.Run( OnMessageAndPublish() );         // start our main thread routine for publishing incoming data on the right thread
         }
 
         private void OnRegisteredEmbodiment( string a_GroupId, string a_SelfId )
@@ -269,23 +262,11 @@ namespace IBM.Watson.Self.Topics
                 Runnable.Stop( m_ReconnectRoutine );
                 m_ReconnectRoutine = -1;
             }
-            if ( m_PublishRoutine >= 0 )
+            if ( m_MessageAndPublishRoutine >= 0 )
             {
-                Runnable.Stop( m_PublishRoutine );
-                m_PublishRoutine = -1;
+                Runnable.Stop( m_MessageAndPublishRoutine );
+                m_MessageAndPublishRoutine = -1;
             }
-            if ( m_MessageRoutine >= 0 )
-            {
-                Runnable.Stop( m_MessageRoutine );
-                m_MessageRoutine = -1;
-            }
-
-            if (m_StateChangeRoutine >= 0)
-            {
-                Runnable.Stop(m_StateChangeRoutine);
-                m_StateChangeRoutine = -1;
-            }
-
             if ( m_Socket != null )
             {
                 m_eState = ClientState.Closing;
@@ -489,12 +470,15 @@ namespace IBM.Watson.Self.Topics
                     yield return null;
             }
         }
-        IEnumerator OnPublish()
+
+        IEnumerator OnMessageAndPublish()
         {
             yield return null;
+            ClientState currentState = m_eState;
 
             while( m_Socket != null )
             {
+                //Check any message on publish list and call subscribed methods
                 lock(m_PublishList)
                 {
                     if ( m_PublishList.Count > 0 )
@@ -519,15 +503,7 @@ namespace IBM.Watson.Self.Topics
                     }
                 }
 
-                yield return null;
-            }
-        }
-        IEnumerator OnMessage()
-        {
-            yield return null;
-
-            while( m_Socket != null )
-            {
+                //Check any message on message incoming list and call subscribed methods
                 lock(m_Incoming)
                 {
                     for(int i=0;i<m_Incoming.Count;++i)
@@ -565,23 +541,12 @@ namespace IBM.Watson.Self.Topics
                     m_Incoming.Clear();
                 }
 
-                yield return null;
-            }
-        }
-
-        IEnumerator OnStateChange()
-        {
-            yield return null;
-            ClientState currentState = m_eState;
-
-            while( m_Socket != null )
-            {
-                
+                //Check if there is state change then call subscribed methods
                 if (currentState != m_eState)
                 {
                     if (StateChangedEvent != null)
                         StateChangedEvent(currentState, m_eState);
-                    
+
                     currentState = m_eState;
                 }
 
