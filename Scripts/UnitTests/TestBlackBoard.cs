@@ -35,6 +35,12 @@ namespace IBM.Watson.Self.UnitTests
         public override IEnumerator RunTest()
         {
             m_Client = TopicClient.Instance;
+            if ( m_Client.IsActive )
+            {
+                m_Client.Disconnect();
+                while( m_Client.IsActive ) 
+                    yield return null;
+            }
 
             m_Client.ConnectedEvent += OnConnected;
             m_Client.DisconnectedEvent += OnDisconnected;

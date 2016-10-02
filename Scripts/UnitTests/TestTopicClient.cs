@@ -33,6 +33,12 @@ namespace IBM.Watson.Self.UnitTests
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
+            if ( client.IsActive )
+            {
+                client.Disconnect();
+                while( client.IsActive ) 
+                    yield return null;
+            }
 
             client.ConnectedEvent += OnConnected;
             client.DisconnectedEvent += OnDisconnected;
@@ -74,7 +80,7 @@ namespace IBM.Watson.Self.UnitTests
 
         private void OnMicrophoneData( TopicClient.Payload a_Payload )
         {
-            Log.Debug( "TopicClient", "OnMicrophoneData() - received {0} bytes", a_Payload.Data.Length );
+            Log.Debug( "TopicClient", "OnMicrophoneData() received. Payload: {0}", a_Payload );
             Test( TopicClient.Instance.Unsubscribe( "sensor-Microphone", OnMicrophoneData ) );
             m_bSubscribeBinaryTested = true;
 
@@ -85,14 +91,14 @@ namespace IBM.Watson.Self.UnitTests
 
         private void OnBlackboard( TopicClient.Payload a_Payload )
         {
-            Log.Debug( "TopicClient", "OnBlackboard() - {0}", Encoding.UTF8.GetString( a_Payload.Data ) );
+            Log.Debug( "TopicClient", "OnBlackboard(). Payload: {0} \n Data: {1}", a_Payload, Encoding.UTF8.GetString( a_Payload.Data ) );
             Test( TopicClient.Instance.Unsubscribe( "blackboard", OnBlackboard ) );
             m_bSubscribeTextTested = true;
         }
 
         private void OnInvalidTopic( TopicClient.Payload a_Payload )
         {
-            Log.Debug( "TopicClient", "OnInvalidTopic() " );
+            Log.Debug( "TopicClient", "OnInvalidTopic(). Payload: {0}", a_Payload );
             Test( a_Payload == null );
             m_bSubFailedTested = true;
         }
