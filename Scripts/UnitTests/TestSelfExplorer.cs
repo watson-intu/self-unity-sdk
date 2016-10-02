@@ -56,7 +56,12 @@ namespace IBM.Watson.Self.UnitTests
            
             while(! m_bExplorerTested )
                 yield return null;
-            
+
+            m_Explorer.OnNodeAdded -= OnNodeAdded;
+            m_Explorer.OnNodeRemoved -= OnNodeRemoved;
+            m_Explorer.OnNodeReady -= OnNodeReady;
+            m_Explorer.OnExplorerDone -= OnExploreDone;
+
             yield break;
         }
 
