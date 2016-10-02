@@ -25,31 +25,27 @@ namespace IBM.Watson.Self.UnitTests
 {
     public class TestBlackBoard : UnitTest
     {
-
-        string m_Host = "ws://192.168.1.9:9443";
-        string m_GroupId = "e664f5dd5c108e01b140180b50f4eafe";
-        string m_SelfId = "aecea8a8afa3d8f224c12576512c7e0f";
         string m_TargetPath = "";
             
         bool m_bSubscribeTested = false;
         bool m_ConnectionClosed = false;
 
-        TopicClient client = null;
+        TopicClient m_Client = null;
 
         public override IEnumerator RunTest()
         {
-            client = TopicClient.Instance;
+            m_Client = TopicClient.Instance;
 
-            client.ConnectedEvent += OnConnected;
-            client.DisconnectedEvent += OnDisconnected;
+            m_Client.ConnectedEvent += OnConnected;
+            m_Client.DisconnectedEvent += OnDisconnected;
 
-            client.Connect( m_Host, m_GroupId, m_SelfId);
+            m_Client.Connect();
 
             while(! m_bSubscribeTested )
                 yield return null;
 
             Log.Debug( "TestBlackBoard", "Tested Subscription now disconnecting" );
-            client.Disconnect();
+            m_Client.Disconnect();
                 
             while(! m_ConnectionClosed )
                 yield return null;
@@ -60,7 +56,7 @@ namespace IBM.Watson.Self.UnitTests
         private void OnConnected()
         {
             Log.Debug( "TestBlackBoard", "OnConnected" );
-            client.Target = m_TargetPath;
+            m_Client.Target = m_TargetPath;
             BlackBoard.Instance.SubscribeToType( "Text", OnText );
             m_ConnectionClosed = false;
         }
@@ -71,8 +67,8 @@ namespace IBM.Watson.Self.UnitTests
 
             if (m_bSubscribeTested)
             {
-                client.ConnectedEvent -= OnConnected;
-                client.DisconnectedEvent -= OnDisconnected;
+                m_Client.ConnectedEvent -= OnConnected;
+                m_Client.DisconnectedEvent -= OnDisconnected;
             }
             m_ConnectionClosed = true;
         }

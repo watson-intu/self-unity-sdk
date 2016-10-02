@@ -29,10 +29,6 @@ namespace IBM.Watson.Self.UnitTests
         bool m_bExplorerTested = false;
         SelfExplorer m_Explorer = new SelfExplorer();
 
-        string m_Host = "ws://toolingllcparent06018d201ef936fe58e80dd623db7866.mybluemix.net:80";
-        string m_GroupId = "c631a39d87ec8f87155e7b91238e9826";
-        string m_SelfId = "22071b9763dcc3fbb14aed7fc3884d3f";
-
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
@@ -43,7 +39,7 @@ namespace IBM.Watson.Self.UnitTests
                     yield return null;
             }
 
-            client.Connect( m_Host, m_GroupId, m_SelfId);
+            client.Connect();
 
             m_Explorer.OnNodeAdded += OnNodeAdded;
             m_Explorer.OnNodeRemoved += OnNodeRemoved;

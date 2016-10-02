@@ -125,7 +125,8 @@ namespace IBM.Watson.Self.Utils
                     {
                         foreach( string childId in m_Info.Children )
                         {
-                            if ( childId == m_Source || childId == SelfId ){
+                            if ( childId == m_Source || childId == SelfId )
+                            {
                                 Log.Debug( "SelfExplorer", "Skippig New Child check. Is Source:  {0} - Is Me: {1}, child: {2}, source: {3}, selfId: {4}", (childId == m_Source), (childId == SelfId), childId, m_Source, SelfId );
                                 continue;           // skip our source
                             }
@@ -144,9 +145,6 @@ namespace IBM.Watson.Self.Utils
                                 
                                 // no existing node found, create one..
                                 child = new Node(m_Explorer);
-                                //TODO: This child doesn't contain any data! We may assign SelfId to fill all the information after query. 
-                                //child.m_Info = new TopicClient.QueryInfo();
-                                //child.m_Info.SelfId = childId;
 
                                 m_Children.Add( child );
                                 Log.Debug( "SelfExplorer", "New child added {0} - \nQuery: {1}", child, m_Info );
@@ -218,7 +216,6 @@ namespace IBM.Watson.Self.Utils
         public OnNode OnNodeRemoved { get; set; }
         public OnDone OnExplorerDone { get; set; }
         #endregion
-
 
         #region Public Functions
         public void Explore( string a_StartTarget = "" )
