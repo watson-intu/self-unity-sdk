@@ -58,6 +58,11 @@ namespace IBM.Watson.Self.Topics
             public string Type { get; set; }          // the type of data
             public bool Persisted { get; set; }   // true if this was a persisted payload
             public string RemoteOrigin { get; set; }  // this is set to the origin that published this payload 
+
+            public override string ToString()
+            {
+                return string.Format("[Payload: Topic={0}, Origin={1}, Data Length={2}, Type={3}, Persisted={4}, RemoteOrigin={5}]", Topic, Origin, ((Data != null)? Data.Length.ToString() : "-"), Type, Persisted, RemoteOrigin);
+            }
         };
         public delegate void OnPayload(Payload a_Payload);
 
@@ -94,6 +99,7 @@ namespace IBM.Watson.Self.Topics
         public delegate void OnConnected();
         public delegate void OnDisconnected();
         public delegate void MessageHandler( IDictionary a_Message );
+        public delegate void OnStateStateChanged( ClientState a_PrevState, ClientState a_CurrentState);
         #endregion
 
         #region Private Types
@@ -140,6 +146,8 @@ namespace IBM.Watson.Self.Topics
         int             m_MessageRoutine = -1;
         List<IDictionary> m_Incoming = new List<IDictionary>();
         SelfLogin       m_Login = null;
+
+        int             m_StateChangeRoutine = -1;
         #endregion
 
         #region Public Interface
@@ -153,6 +161,7 @@ namespace IBM.Watson.Self.Topics
 
         public OnConnected ConnectedEvent { get; set; }
         public OnDisconnected DisconnectedEvent { get; set; }
+        public OnStateStateChanged StateChangedEvent {get;set;}
 
         public TopicClient()
         {
@@ -234,6 +243,8 @@ namespace IBM.Watson.Self.Topics
                 m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
             if ( m_MessageRoutine < 0 )
                 m_MessageRoutine = Runnable.Run( OnMessage() );
+            if (m_StateChangeRoutine < 0)
+                m_StateChangeRoutine = Runnable.Run( OnStateChange() );
         }
 
         private void OnRegisteredEmbodiment( string a_GroupId, string a_SelfId )
@@ -267,6 +278,12 @@ namespace IBM.Watson.Self.Topics
             {
                 Runnable.Stop( m_MessageRoutine );
                 m_MessageRoutine = -1;
+            }
+
+            if (m_StateChangeRoutine >= 0)
+            {
+                Runnable.Stop(m_StateChangeRoutine);
+                m_StateChangeRoutine = -1;
             }
 
             if ( m_Socket != null )
@@ -546,6 +563,26 @@ namespace IBM.Watson.Self.Topics
                     }
 
                     m_Incoming.Clear();
+                }
+
+                yield return null;
+            }
+        }
+
+        IEnumerator OnStateChange()
+        {
+            yield return null;
+            ClientState currentState = m_eState;
+
+            while( m_Socket != null )
+            {
+                
+                if (currentState != m_eState)
+                {
+                    if (StateChangedEvent != null)
+                        StateChangedEvent(currentState, m_eState);
+                    
+                    currentState = m_eState;
                 }
 
                 yield return null;
