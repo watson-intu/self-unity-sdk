@@ -34,8 +34,7 @@ namespace IBM.Watson.Self.UnitTests
         {
             TopicClient client = TopicClient.Instance;
 
-            client.ConnectedEvent += OnConnected;
-            client.DisconnectedEvent += OnDisconnected;
+            client.StateChangedEvent += OnStateChanged;
 
             client.Connect();
             while(! m_bQueryTested )
@@ -47,10 +46,24 @@ namespace IBM.Watson.Self.UnitTests
             while(! m_bSubFailedTested )
                 yield return null;
 
-            client.ConnectedEvent -= OnConnected;
-            client.DisconnectedEvent -= OnDisconnected;
+            client.StateChangedEvent -= OnStateChanged;
 
             yield break;
+        }
+
+        void OnStateChanged(TopicClient.ClientState a_PreviousState, TopicClient.ClientState a_CurrentState)
+        {
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
         }
 
         private void OnConnected()

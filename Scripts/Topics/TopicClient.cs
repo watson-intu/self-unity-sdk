@@ -144,20 +144,19 @@ namespace IBM.Watson.Self.Topics
         int             m_MessageAndPublishRoutine = -1;
         List<Payload>   m_PublishList = new List<Payload>();
         List<IDictionary> m_Incoming = new List<IDictionary>();
+        List<ClientState> m_StateList = new List<ClientState>();
         SelfLogin       m_Login = null;
         #endregion
 
         #region Public Interface
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
         public bool IsActive { get { return m_eState != ClientState.Inactive && m_eState != ClientState.Disconnected; } }
-        public ClientState State { get { return m_eState; } }
+        public ClientState State { get { return m_eState; } private set{ m_eState = value; lock (m_StateList) m_StateList.Add(value); } }
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
         public string Target { get; set; }
         public bool Authenticated { get { return m_bAuthenticated; } }
 
-        public OnConnected ConnectedEvent { get; set; }
-        public OnDisconnected DisconnectedEvent { get; set; }
         public OnStateStateChanged StateChangedEvent {get;set;}
 
         public TopicClient()
@@ -197,7 +196,7 @@ namespace IBM.Watson.Self.Topics
             }
 
             m_Host = a_Host;
-            m_eState = ClientState.Connecting;
+            State = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = a_selfId;
             m_bAuthenticated = false;
@@ -269,7 +268,7 @@ namespace IBM.Watson.Self.Topics
             }
             if ( m_Socket != null )
             {
-                m_eState = ClientState.Closing;
+                State = ClientState.Closing;
                 m_Socket.CloseAsync();
             }
         }
@@ -421,10 +420,8 @@ namespace IBM.Watson.Self.Topics
         void OnSocketOpen(object sender, EventArgs e)
         {
             Log.Status("TopicClient", "Connected to {0}", m_Host );
-            m_eState = ClientState.Connected;
+            State = ClientState.Connected;
 
-            if ( ConnectedEvent != null )
-                ConnectedEvent();
             for(int i=0;i<m_SendQueue.Count;++i)
                 SendMessage( m_SendQueue[i] );
             m_SendQueue.Clear();
@@ -439,13 +436,11 @@ namespace IBM.Watson.Self.Topics
             Log.Status("TopicClient", "OnSocketClosed: {0}", e.Reason );
 
             if ( m_eState != ClientState.Closing )
-                m_eState = ClientState.Disconnected;
-            if ( DisconnectedEvent != null )
-                DisconnectedEvent();
+                State = ClientState.Disconnected;
 
             if ( m_eState == ClientState.Closing )
             {
-                m_eState = ClientState.Inactive;
+                State = ClientState.Inactive;
                 m_Socket = null;
             }
         }
@@ -474,7 +469,7 @@ namespace IBM.Watson.Self.Topics
         IEnumerator OnMessageAndPublish()
         {
             yield return null;
-            ClientState currentState = m_eState;
+            ClientState previousState = m_eState;
 
             while( m_Socket != null )
             {
@@ -542,12 +537,20 @@ namespace IBM.Watson.Self.Topics
                 }
 
                 //Check if there is state change then call subscribed methods
-                if (currentState != m_eState)
+                lock (m_StateList)
                 {
-                    if (StateChangedEvent != null)
-                        StateChangedEvent(currentState, m_eState);
-
-                    currentState = m_eState;
+                    for (int i = 0; i < m_StateList.Count; i++)
+                    {
+                        if (previousState != m_StateList[i])
+                        {
+                            if (StateChangedEvent != null)
+                            {
+                                StateChangedEvent(previousState, m_StateList[i]);
+                            }
+                            previousState = m_StateList[i];
+                        }
+                    }
+                    m_StateList.Clear();
                 }
 
                 yield return null;

@@ -43,9 +43,14 @@ namespace IBM.Watson.Self.Sensors
 
         public SensorManager()
         {
-            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
-            TopicClient.Instance.ConnectedEvent += OnConnected;
+            TopicClient.Instance.StateChangedEvent += OnStateChanged;
             TopicClient.Instance.Subscribe( "sensor-manager", OnSensorManagerEvent );
+        }
+
+        ~SensorManager()  
+        {
+            TopicClient.Instance.StateChangedEvent -= OnStateChanged;
+            TopicClient.Instance.Unsubscribe( "sensor-manager", OnSensorManagerEvent );
         }
 
         public bool IsRegistered( ISensor a_Sensor )
@@ -107,6 +112,21 @@ namespace IBM.Watson.Self.Sensors
         #endregion
 
         #region Callback Functions
+        void OnStateChanged(TopicClient.ClientState a_PreviousState, TopicClient.ClientState a_CurrentState)
+        {
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
+        }
+
         void OnConnected()
         {
             if (m_bDisconnected)

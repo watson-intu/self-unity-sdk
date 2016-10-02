@@ -36,8 +36,7 @@ namespace IBM.Watson.Self.UnitTests
         {
             m_Client = TopicClient.Instance;
 
-            m_Client.ConnectedEvent += OnConnected;
-            m_Client.DisconnectedEvent += OnDisconnected;
+            m_Client.StateChangedEvent += OnStateChanged;
 
             m_Client.Connect();
 
@@ -49,8 +48,25 @@ namespace IBM.Watson.Self.UnitTests
                 
             while(! m_ConnectionClosed )
                 yield return null;
-            
+
+            m_Client.StateChangedEvent -= OnStateChanged;
+
             yield break;
+        }
+
+        void OnStateChanged(TopicClient.ClientState a_PreviousState, TopicClient.ClientState a_CurrentState)
+        {
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
         }
 
         private void OnConnected()
@@ -64,12 +80,6 @@ namespace IBM.Watson.Self.UnitTests
         private void OnDisconnected()
         {
             Log.Debug( "TestBlackBoard", "OnDisconnected" );
-
-            if (m_bSubscribeTested)
-            {
-                m_Client.ConnectedEvent -= OnConnected;
-                m_Client.DisconnectedEvent -= OnDisconnected;
-            }
             m_ConnectionClosed = true;
         }
 
