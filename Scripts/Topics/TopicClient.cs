@@ -96,8 +96,6 @@ namespace IBM.Watson.Self.Topics
             }
         };
         public delegate void OnQueryResponse(QueryInfo a_Info);
-        public delegate void OnConnected();
-        public delegate void OnDisconnected();
         public delegate void MessageHandler( IDictionary a_Message );
         public delegate void OnStateStateChanged(ClientState a_State);
         #endregion
@@ -159,8 +157,6 @@ namespace IBM.Watson.Self.Topics
         public string Target { get; set; }
         public bool Authenticated { get { return m_bAuthenticated; } }
 
-        public OnConnected ConnectedEvent { get; set; }
-        public OnDisconnected DisconnectedEvent { get; set; }
         public OnStateStateChanged StateChangedEvent {get;set;}
 
         public TopicClient()
@@ -583,15 +579,6 @@ namespace IBM.Watson.Self.Topics
                                 StateChangedEvent(m_StateList[i]);
                             }
                             previousState = m_StateList[i];
-                        }
-
-                        if (m_StateList[i] == ClientState.Connected && ConnectedEvent != null)
-                        {
-                            ConnectedEvent();
-                        }
-                        else if (m_StateList[i] == ClientState.Disconnected && DisconnectedEvent != null)
-                        {
-                            DisconnectedEvent();
                         }
                     }
                     m_StateList.Clear();

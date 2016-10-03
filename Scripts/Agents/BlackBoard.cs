@@ -56,18 +56,15 @@ namespace IBM.Watson.Self.Agents
 
         public BlackBoard()
         {
-            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
-            TopicClient.Instance.ConnectedEvent += OnConnected;
+            TopicClient.Instance.StateChangedEvent += OnStateChanged;
             TopicClient.Instance.Subscribe( "blackboard", OnBlackBoardEvent );
         }
 
         ~BlackBoard()  // destructor to clean-up events listeners
         {
-            TopicClient.Instance.DisconnectedEvent -= OnDisconnected;
-            TopicClient.Instance.ConnectedEvent -= OnConnected;
+            TopicClient.Instance.StateChangedEvent -= OnStateChanged;
             TopicClient.Instance.Unsubscribe( "blackboard", OnBlackBoardEvent );
         }
-
 
         public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL )
         {
@@ -120,6 +117,22 @@ namespace IBM.Watson.Self.Agents
         #endregion
 
         #region Event Handlers
+
+        void OnStateChanged(TopicClient.ClientState a_CurrentState)
+        {
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
+        }
+
         void OnConnected()
         {
             if (m_bDisconnected)
