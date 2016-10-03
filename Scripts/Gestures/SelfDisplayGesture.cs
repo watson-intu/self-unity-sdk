@@ -16,7 +16,6 @@
 */
 
 using IBM.Watson.DeveloperCloud.Widgets;
-using IBM.Watson.Self.UI.Documents;
 using System;
 using System.Collections;
 using UnityEngine;
