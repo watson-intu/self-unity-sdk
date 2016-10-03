@@ -108,5 +108,10 @@ namespace IBM.Watson.Self.Agents
         public ThingEventType  m_EventType;
         public IDictionary     m_Event;
         public IThing          m_Thing;
+
+        public override string ToString()
+        {
+            return string.Format("[ThingEvent: ThingEventType={0}]", m_EventType);
+        }
     }
 }

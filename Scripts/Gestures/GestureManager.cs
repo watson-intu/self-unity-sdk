@@ -46,9 +46,18 @@ namespace IBM.Watson.Self.Gestures
         /// </summary>
         public GestureManager()
         {
-            TopicClient.Instance.DisconnectedEvent += OnDisconnected;
-            TopicClient.Instance.ConnectedEvent += OnConnected;
+            TopicClient.Instance.StateChangedEvent += OnStateChanged;
             TopicClient.Instance.Subscribe( "gesture-manager", OnGestureManagerEvent );
+        }
+
+        /// <summary>
+        /// Releases unmanaged resources and performs other cleanup operations before the
+        /// <see cref="IBM.Watson.Self.Gestures.GestureManager"/> is reclaimed by garbage collection.
+        /// </summary>
+        ~GestureManager()  
+        {
+            TopicClient.Instance.StateChangedEvent -= OnStateChanged;
+            TopicClient.Instance.Unsubscribe( "gesture-manager", OnGestureManagerEvent );
         }
 
         /// <summary>
@@ -118,6 +127,22 @@ namespace IBM.Watson.Self.Gestures
         #endregion
 
         #region Callback Functions
+
+        void OnStateChanged(TopicClient.ClientState a_CurrentState)
+        {
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
+        }
+
         void OnConnected()
         {
             if (m_bDisconnected)

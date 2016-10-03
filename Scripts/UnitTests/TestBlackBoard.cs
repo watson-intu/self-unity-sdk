@@ -25,38 +25,75 @@ namespace IBM.Watson.Self.UnitTests
 {
     public class TestBlackBoard : UnitTest
     {
+        string m_TargetPath = "";
+            
         bool m_bSubscribeTested = false;
+        bool m_ConnectionClosed = false;
+
+        TopicClient m_Client = null;
 
         public override IEnumerator RunTest()
         {
-            TopicClient client = TopicClient.Instance;
+            m_Client = TopicClient.Instance;
+            if ( m_Client.IsActive )
+            {
+                m_Client.Disconnect();
+                while( m_Client.IsActive ) 
+                    yield return null;
+            }
 
-            client.ConnectedEvent += OnConnected;
-            client.DisconnectedEvent += OnDisconnected;
+            m_Client.StateChangedEvent += OnStateChanged;
 
-            client.Connect( "ws://localhost:9494", "faef2657-5f1b-436b-8225-2fa68728b1bf" );
+            m_Client.Connect();
+
             while(! m_bSubscribeTested )
                 yield return null;
 
-            client.ConnectedEvent -= OnConnected;
-            client.DisconnectedEvent -= OnDisconnected;
+            Log.Debug( "TestBlackBoard", "Tested Subscription now disconnecting" );
+            m_Client.Disconnect();
+                
+            while(! m_ConnectionClosed )
+                yield return null;
+
+            m_Client.StateChangedEvent -= OnStateChanged;
 
             yield break;
+        }
+
+        void OnStateChanged(TopicClient.ClientState a_CurrentState)
+        {
+            Log.Debug( "TestBlackBoard", "OnStateChanged to {0}" , a_CurrentState);
+
+            switch (a_CurrentState)
+            {
+                case TopicClient.ClientState.Connected:
+                    OnConnected();
+                    break;
+                case TopicClient.ClientState.Disconnected:
+                    OnDisconnected();
+                    break;
+                default:
+                    break;
+            }
         }
 
         private void OnConnected()
         {
             Log.Debug( "TestBlackBoard", "OnConnected" );
+            m_Client.Target = m_TargetPath;
             BlackBoard.Instance.SubscribeToType( "Text", OnText );
+            m_ConnectionClosed = false;
         }
 
         private void OnDisconnected()
         {
             Log.Debug( "TestBlackBoard", "OnDisconnected" );
+            m_ConnectionClosed = true;
         }
 
         private void OnText( ThingEvent a_Event )
         {
+            Log.Debug( "TestBlackBoard", "OnText : {0}", a_Event );
             m_bSubscribeTested = true;
 
         }

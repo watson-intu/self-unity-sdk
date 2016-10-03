@@ -58,6 +58,11 @@ namespace IBM.Watson.Self.Topics
             public string Type { get; set; }          // the type of data
             public bool Persisted { get; set; }   // true if this was a persisted payload
             public string RemoteOrigin { get; set; }  // this is set to the origin that published this payload 
+
+            public override string ToString()
+            {
+                return string.Format("[Payload: Topic={0}, Origin={1}, Data Length={2}, Type={3}, Persisted={4}, RemoteOrigin={5}]", Topic, Origin, ((Data != null)? Data.Length.ToString() : "-"), Type, Persisted, RemoteOrigin);
+            }
         };
         public delegate void OnPayload(Payload a_Payload);
 
@@ -65,6 +70,11 @@ namespace IBM.Watson.Self.Topics
         {
             public string TopicId { get; set; }       // the ID of this topic
             public string Type { get; set; }          // type of topic
+
+            public override string ToString()
+            {
+                return string.Format("[TopicInfo: TopicId={0}, Type={1}]", TopicId, Type);
+            }
         };
 
         public class QueryInfo
@@ -79,11 +89,15 @@ namespace IBM.Watson.Self.Topics
             public string Version { get; set; }
             public string[] Children { get; set; }
             public TopicInfo[] Topics { get; set; }
+
+            public override string ToString()
+            {
+                return string.Format("[QueryInfo: bSuccess={0}, Path={1}, GroupId={2}, SelfId={3}, ParentId={4}, Name={5}, Type={6}, Version={7}, \nChildren={8}, \nTopics={9}]", bSuccess, Path, GroupId, SelfId, ParentId, Name, Type, Version, (Children != null)? string.Join(",", Children) : "-" ,  (Topics != null)? string.Join(", \n", Array.ConvertAll<TopicInfo, string>(Topics, Convert.ToString)) : "-");
+            }
         };
         public delegate void OnQueryResponse(QueryInfo a_Info);
-        public delegate void OnConnected();
-        public delegate void OnDisconnected();
         public delegate void MessageHandler( IDictionary a_Message );
+        public delegate void OnStateStateChanged(ClientState a_State);
         #endregion
 
         #region Private Types
@@ -130,19 +144,20 @@ namespace IBM.Watson.Self.Topics
         int             m_MessageRoutine = -1;
         List<IDictionary> m_Incoming = new List<IDictionary>();
         SelfLogin       m_Login = null;
+        List<ClientState> m_StateList = new List<ClientState>();
+        int             m_StateChangeRoutine = -1;
         #endregion
 
         #region Public Interface
         public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
         public bool IsActive { get { return m_eState != ClientState.Inactive && m_eState != ClientState.Disconnected; } }
-        public ClientState State { get { return m_eState; } }
+        public ClientState State { get { return m_eState; } private set{ m_eState = value; lock (m_StateList) m_StateList.Add(value); } }
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
         public string Target { get; set; }
         public bool Authenticated { get { return m_bAuthenticated; } }
 
-        public OnConnected ConnectedEvent { get; set; }
-        public OnDisconnected DisconnectedEvent { get; set; }
+        public OnStateStateChanged StateChangedEvent {get;set;}
 
         public TopicClient()
         {
@@ -181,7 +196,7 @@ namespace IBM.Watson.Self.Topics
             }
 
             m_Host = a_Host;
-            m_eState = ClientState.Connecting;
+            State = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = a_selfId;
             m_bAuthenticated = false;
@@ -224,6 +239,8 @@ namespace IBM.Watson.Self.Topics
                 m_PublishRoutine = Runnable.Run( OnPublish() );         // start our main thread routine for publishing incoming data on the right thread
             if ( m_MessageRoutine < 0 )
                 m_MessageRoutine = Runnable.Run( OnMessage() );
+            if (m_StateChangeRoutine < 0)
+                m_StateChangeRoutine = Runnable.Run( OnStateChange() );
         }
 
         private void OnRegisteredEmbodiment( string a_GroupId, string a_SelfId )
@@ -259,9 +276,15 @@ namespace IBM.Watson.Self.Topics
                 m_MessageRoutine = -1;
             }
 
+            if (m_StateChangeRoutine >= 0)
+            {
+                Runnable.Stop(m_StateChangeRoutine);
+                m_StateChangeRoutine = -1;
+            }
+
             if ( m_Socket != null )
             {
-                m_eState = ClientState.Closing;
+                State = ClientState.Closing;
                 m_Socket.CloseAsync();
             }
         }
@@ -413,10 +436,8 @@ namespace IBM.Watson.Self.Topics
         void OnSocketOpen(object sender, EventArgs e)
         {
             Log.Status("TopicClient", "Connected to {0}", m_Host );
-            m_eState = ClientState.Connected;
+            State = ClientState.Connected;
 
-            if ( ConnectedEvent != null )
-                ConnectedEvent();
             for(int i=0;i<m_SendQueue.Count;++i)
                 SendMessage( m_SendQueue[i] );
             m_SendQueue.Clear();
@@ -431,13 +452,11 @@ namespace IBM.Watson.Self.Topics
             Log.Status("TopicClient", "OnSocketClosed: {0}", e.Reason );
 
             if ( m_eState != ClientState.Closing )
-                m_eState = ClientState.Disconnected;
-            if ( DisconnectedEvent != null )
-                DisconnectedEvent();
+                State = ClientState.Disconnected;
 
             if ( m_eState == ClientState.Closing )
             {
-                m_eState = ClientState.Inactive;
+                State = ClientState.Inactive;
                 m_Socket = null;
             }
         }
@@ -538,6 +557,32 @@ namespace IBM.Watson.Self.Topics
                     m_Incoming.Clear();
                 }
 
+                yield return null;
+            }
+        }
+
+        IEnumerator OnStateChange()
+        {
+            yield return null;
+            ClientState previousState = State;
+
+            while( m_Socket != null )
+            {
+                lock (m_StateList)
+                {
+                    for (int i = 0; i < m_StateList.Count; i++)
+                    {
+                        if (previousState != m_StateList[i])
+                        {
+                            if (StateChangedEvent != null)
+                            {
+                                StateChangedEvent(m_StateList[i]);
+                            }
+                            previousState = m_StateList[i];
+                        }
+                    }
+                    m_StateList.Clear();
+                }
                 yield return null;
             }
         }

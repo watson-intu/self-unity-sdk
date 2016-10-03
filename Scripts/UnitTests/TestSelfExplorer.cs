@@ -28,11 +28,11 @@ namespace IBM.Watson.Self.UnitTests
     {
         bool m_bExplorerTested = false;
         SelfExplorer m_Explorer = new SelfExplorer();
+        int m_NumberOfExplorationToTest = 1;
 
         public override IEnumerator RunTest()
         {
             TopicClient client = TopicClient.Instance;
-
             if ( client.IsActive )
             {
                 client.Disconnect();
@@ -47,30 +47,39 @@ namespace IBM.Watson.Self.UnitTests
             m_Explorer.OnNodeReady += OnNodeReady;
             m_Explorer.OnExplorerDone += OnExploreDone;
 
-            m_Explorer.Explore();
+            for (int i = 0; i < m_NumberOfExplorationToTest; i++)
+            {
+                Log.Debug( "TestSelfExplorer", "Exploration # {0} is starting.", (i+1).ToString() );
+                m_Explorer.Explore();
+                while(! m_bExplorerTested )
+                    yield return null;
 
-            while(! m_bExplorerTested )
-                yield return null;
+                m_bExplorerTested = false;
+            }
+
+            m_Explorer.OnNodeAdded -= OnNodeAdded;
+            m_Explorer.OnNodeRemoved -= OnNodeRemoved;
+            m_Explorer.OnNodeReady -= OnNodeReady;
+            m_Explorer.OnExplorerDone -= OnExploreDone;
 
             yield break;
         }
 
         private void OnNodeAdded( SelfExplorer.Node a_Added )
         {
-            //Log.Debug( "TestSelfExplorer", "OnNodeAdded" );
+            Log.Debug( "TestSelfExplorer", "OnNodeAdded: {0}", a_Added );
         }
         private void OnNodeRemoved( SelfExplorer.Node a_Added )
         {
-            Log.Debug( "TestSelfExplorer", "OnNodeRemoved, selfId = {0}", a_Added.SelfId );
+            Log.Debug( "TestSelfExplorer", "OnNodeRemoved: {0}", a_Added );
         }
         private void OnNodeReady( SelfExplorer.Node a_Node )
         {
-            Log.Debug( "TestSelfExplorer", "OnNodeReady, path = {0}, groupId = {1}, selfId = {2}, parentId = {3}",
-                a_Node.Path, a_Node.GroupId, a_Node.SelfId, a_Node.ParentId );
+            Log.Debug( "TestSelfExplorer", "OnNodeReady: {0}", a_Node);
         }
         private void OnExploreDone( SelfExplorer a_Explorer )
         {
-            Log.Debug( "TestSelfExplorer", "OnExploreDone" );
+            Log.Debug( "TestSelfExplorer", "OnExploreDone: {0}", a_Explorer );
             m_bExplorerTested = true;
         }
     }
