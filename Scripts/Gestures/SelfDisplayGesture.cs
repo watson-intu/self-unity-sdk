@@ -1,4 +1,7 @@
-﻿/**
+﻿
+
+using IBM.Watson.DeveloperCloud.Logging;
+/**
 * Copyright 2016 IBM Corp. All Rights Reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +17,8 @@
 * limitations under the License.
 *
 */
-
 using IBM.Watson.DeveloperCloud.Widgets;
+using MiniJSON;
 using System;
 using System.Collections;
 using UnityEngine;
@@ -76,11 +79,41 @@ namespace IBM.Watson.Self.Gestures
         {
             bool bError = false;
 
-            string display = a_Params["display"] as string;
-            IDictionary data = a_Params["data"] as IDictionary;
+            string type = a_Params["display"] as string;
+            string data = a_Params["data"] as string;
 
-            if (! m_DocumentOutput.SendData( new DocumentModel( display, data ) ) )
+            object document = Json.Deserialize(data);
+            if ( document != null )
+            {
+                if ( document is IList )
+                {
+                    IList document_list = document as IList;
+                    foreach( var doc in document_list )
+                    {
+                        if ( !(doc is IDictionary) )
+                            continue;
+
+                        if (! m_DocumentOutput.SendData( new DocumentModel( type, doc as IDictionary ) ) )
+                        {
+                            Log.Error( "SelfDisplayGesture", "Failed to send data." );
+                            bError = true;
+                        }
+                    }
+                }
+                else if ( document is IDictionary )
+                {
+                    if (! m_DocumentOutput.SendData( new DocumentModel( type, document as IDictionary ) ) )
+                    {
+                        Log.Error( "SelfDisplayGesture", "Failed to send data." );
+                        bError = true;
+                    }
+                }
+            }
+            else
+            {
+                Log.Error( "SelfDisplayGesture", "document data not json format: {0}", data );
                 bError = true;
+            }
 
             if (a_Callback != null)
                 a_Callback(this, bError );
