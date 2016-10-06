@@ -61,8 +61,19 @@ namespace IBM.Watson.Self.Topics
 
             public override string ToString()
             {
-                return string.Format("[Payload: Topic={0}, Origin={1}, Data Length={2}, Type={3}, Persisted={4}, RemoteOrigin={5}]", Topic, Origin, ((Data != null)? Data.Length.ToString() : "-"), Type, Persisted, RemoteOrigin);
+                return string.Format("[Payload: Topic={0}, Origin={1}, Data Length={2}, Type={3}, Persisted={4}, RemoteOrigin={5}]",
+                    Topic, Origin, ((Data != null)? Data.Length.ToString() : "-"), Type, Persisted, RemoteOrigin);
             }
+
+            public IDictionary ParseJson()
+            {
+                if ( m_ParsedJson == null )
+                    m_ParsedJson = Json.Deserialize( Encoding.UTF8.GetString( Data ) ) as IDictionary;
+
+                return m_ParsedJson;
+            }
+
+            private IDictionary m_ParsedJson = null;
         };
         public delegate void OnPayload(Payload a_Payload);
 
