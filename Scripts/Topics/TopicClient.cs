@@ -554,6 +554,9 @@ namespace IBM.Watson.Self.Topics
                         else if (json.Contains("msg"))
                         {
                             string msg = json["msg"] as string;
+                            string origin = json["orgin"] as string;
+                            if ( origin.StartsWith( "../" ) )
+                                origin = origin.Substring( 3 );     // remove the leading ../ from the origin
 
                             MessageHandler handler = null;
                             if (m_MessageHandlers.TryGetValue(msg, out handler))
