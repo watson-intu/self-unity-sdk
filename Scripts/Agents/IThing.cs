@@ -73,6 +73,9 @@ namespace IBM.Watson.Self.Agents
         public IDictionary Serialize()
         {
             Dictionary<string,object> json = new Dictionary<string, object>();
+
+            foreach( string key in Body.Keys )
+                json[key] = Body[key];
             json["Type_"] = Type;
             json["m_eCategory"] = (int)Category;
             json["m_GUID"] = GUID;
