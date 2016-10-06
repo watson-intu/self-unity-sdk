@@ -18,6 +18,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using IBM.Watson.Self.Utils;
+using System;
+using IBM.Watson.DeveloperCloud.Utilities;
 
 namespace IBM.Watson.Self.Agents
 {
@@ -34,6 +36,17 @@ namespace IBM.Watson.Self.Agents
     /// </summary>
     public class IThing : ISerializable
     {
+        public IThing()
+        {
+            Type        = "IThing";
+            Category    = ThingCategory.TT_PERCEPTION;
+            GUID        = Guid.NewGuid().ToString();
+            Importance  = 1.0f;
+            State       = "ADDED";
+            CreateTime  = Utility.GetEpochUTCSeconds();
+            LifeSpan    = 3600.0;
+        }
+
         #region Public Properties
         // IMplementation type
         public string Type { get; set; }
