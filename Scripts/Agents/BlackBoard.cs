@@ -128,7 +128,7 @@ namespace IBM.Watson.Self.Agents
             Dictionary<string,object> add_object = new Dictionary<string, object>();
             add_object["event"] = "add_object";
             add_object["type"] = string.IsNullOrEmpty( a_Thing.DataType ) ? a_Thing.Type : a_Thing.DataType;
-            add_object["thing"] = Json.Serialize( a_Thing.Serialize() );
+            add_object["thing"] = a_Thing.Serialize();
             if (!string.IsNullOrEmpty( a_Thing.ParentGUID ) )
                 add_object["parent"] = a_Thing.ParentGUID;
 
