@@ -48,6 +48,7 @@ namespace IBM.Watson.Self.Agents
         }
         private Dictionary<string,List<Subscriber>>   m_SubscriberMap = new Dictionary<string, List<Subscriber>>();
         private Dictionary<string,IThing> m_ThingMap = new Dictionary<string, IThing>();
+        private Dictionary<string,bool> m_Blackboard= new Dictionary<string, bool>();
         private bool m_bDisconnected = false;
         #endregion
 
@@ -57,17 +58,24 @@ namespace IBM.Watson.Self.Agents
         public BlackBoard()
         {
             TopicClient.Instance.StateChangedEvent += OnStateChanged;
-            TopicClient.Instance.Subscribe( "blackboard", OnBlackBoardEvent );
         }
 
         ~BlackBoard()  // destructor to clean-up events listeners
         {
             TopicClient.Instance.StateChangedEvent -= OnStateChanged;
-            TopicClient.Instance.Unsubscribe( "blackboard", OnBlackBoardEvent );
+
+            foreach( var kv in m_Blackboard )
+                TopicClient.Instance.Unsubscribe( kv.Key + "blackboard", OnBlackBoardEvent );
         }
 
         public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL, string a_Path = "" )
         {
+            if (! m_Blackboard.ContainsKey(a_Path) )
+            {
+                TopicClient.Instance.Subscribe( a_Path + "blackboard", OnBlackBoardEvent );
+                m_Blackboard[ a_Path ] = true;
+            }
+
             if (!m_SubscriberMap.ContainsKey(a_Type))
             {
                 m_SubscriberMap[a_Type] = new List<Subscriber>();
