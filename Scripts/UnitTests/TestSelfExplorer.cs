@@ -28,7 +28,6 @@ namespace IBM.Watson.Self.UnitTests
     {
         bool m_bExplorerTested = false;
         SelfExplorer m_Explorer = new SelfExplorer();
-        int m_NumberOfExplorationToTest = 1;
 
         public override IEnumerator RunTest()
         {
@@ -47,20 +46,9 @@ namespace IBM.Watson.Self.UnitTests
             m_Explorer.OnNodeReady += OnNodeReady;
             m_Explorer.OnExplorerDone += OnExploreDone;
 
-            for (int i = 0; i < m_NumberOfExplorationToTest; i++)
-            {
-                Log.Debug( "TestSelfExplorer", "Exploration # {0} is starting.", (i+1).ToString() );
-                m_Explorer.Explore();
-                while(! m_bExplorerTested )
-                    yield return null;
-
-                m_bExplorerTested = false;
-            }
-
-            m_Explorer.OnNodeAdded -= OnNodeAdded;
-            m_Explorer.OnNodeRemoved -= OnNodeRemoved;
-            m_Explorer.OnNodeReady -= OnNodeReady;
-            m_Explorer.OnExplorerDone -= OnExploreDone;
+            m_Explorer.Explore();
+            while(! m_bExplorerTested )
+                yield return null;
 
             yield break;
         }
@@ -80,7 +68,7 @@ namespace IBM.Watson.Self.UnitTests
         private void OnExploreDone( SelfExplorer a_Explorer )
         {
             Log.Debug( "TestSelfExplorer", "OnExploreDone: {0}", a_Explorer );
-            m_bExplorerTested = true;
+            //m_bExplorerTested = true;
         }
     }
 }

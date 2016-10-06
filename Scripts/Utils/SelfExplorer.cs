@@ -16,7 +16,10 @@
 */
 
 using IBM.Watson.DeveloperCloud.Logging;
+using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.Self.Topics;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace IBM.Watson.Self.Utils
@@ -65,7 +68,6 @@ namespace IBM.Watson.Self.Utils
                 m_bError = false;
 
                 m_Explorer.m_PendingRequests += 1;
-                Log.Debug( "SelfExplorer", "Refresh. Path: {0}, Source: {1}", m_Path, a_Source );
                 TopicClient.Instance.Query( m_Path, OnQueryResponse );
             }
 
@@ -83,15 +85,80 @@ namespace IBM.Watson.Self.Utils
                 return false;
             }
 
+            private void OnTopicManagerEvent( TopicClient.Payload a_Event )
+            {
+                if ( a_Event != null )
+                {
+                    IDictionary json = a_Event.ParseJson();
+
+                    string event_name = json["event"] as string;
+                    if ( event_name == "connected" )
+                    {
+                        string groupId = json["groupId"] as string;
+                        string selfId = json["selfId"] as string;
+
+                        if ( (bool)json["parent"] )
+                        {
+                            if ( Parent != null )
+                                throw new WatsonException( "Parent is already set!" );
+
+                            Parent = new Node(m_Explorer);
+                            Parent.Children.Add( this );
+                            if ( m_Explorer.OnNodeAdded != null )
+                                m_Explorer.OnNodeAdded( Parent );
+                            Parent.Refresh( m_Path + "../", SelfId );
+                        }
+                        else
+                        {
+                            Node child = new Node(m_Explorer);
+                            m_Children.Add( child );
+
+                            if ( m_Explorer.OnNodeAdded != null )
+                                m_Explorer.OnNodeAdded( child );
+
+                            child.Refresh( m_Path + selfId + "/", SelfId );
+                        }
+                    }
+                    else if ( event_name == "disconnected" )
+                    {
+                        string groupId = json["groupId"] as string;
+                        string selfId = json["selfId"] as string;
+                    
+                        if ( Parent != null && Parent.SelfId == selfId )
+                        {
+                            if ( m_Explorer.OnNodeRemoved != null )
+                                m_Explorer.OnNodeRemoved( Parent );
+                            Parent = null;
+                        }
+                        else
+                        {
+                            foreach( Node child in m_Children )
+                                if ( child.SelfId == selfId )
+                                {
+                                    if ( m_Explorer.OnNodeRemoved != null )
+                                        m_Explorer.OnNodeRemoved( child );
+                                
+                                    m_Children.Remove( child );
+                                    break;
+                                }
+                        }
+                    }
+                }
+                else
+                {
+                    Log.Error( "SelfExplorer", "Failed to subscribe to topic-manager, node: {0}", ToString() );
+                }
+            }
+
             private void OnQueryResponse( TopicClient.QueryInfo a_Info )
             {
                 m_Explorer.m_PendingRequests -= 1;
                 m_Info = a_Info;
 
-                Log.Debug( "SelfExplorer", "OnQueryResponse {0} . Source: {1}, SelfId: {2}", a_Info, m_Source, SelfId);
-
                 if ( m_Info != null )
                 {
+                    TopicClient.Instance.Subscribe( m_Path + "topic-manager", OnTopicManagerEvent );
+
                     if (! string.IsNullOrEmpty( m_Info.ParentId ) )
                     {
                         if ( m_Info.ParentId != m_Source )
@@ -101,8 +168,6 @@ namespace IBM.Watson.Self.Utils
                                 Parent = new Node(m_Explorer);
                                 Parent.Children.Add( this );
                         
-                                Log.Debug( "SelfExplorer", "New child added from Parent {0} - \nQuery: {1}", Parent, m_Info );
-
                                 if ( m_Explorer.OnNodeAdded != null )
                                     m_Explorer.OnNodeAdded( Parent );
 
@@ -114,7 +179,6 @@ namespace IBM.Watson.Self.Utils
                     }
                     else if ( Parent != null )
                     {
-                        Log.Debug( "SelfExplorer", "Parent is gone : {0}", Parent );
                         if ( m_Explorer.OnNodeRemoved != null )
                             m_Explorer.OnNodeRemoved( Parent );
 
@@ -126,10 +190,7 @@ namespace IBM.Watson.Self.Utils
                         foreach( string childId in m_Info.Children )
                         {
                             if ( childId == m_Source || childId == SelfId )
-                            {
-                                Log.Debug( "SelfExplorer", "Skippig New Child check. Is Source:  {0} - Is Me: {1}, child: {2}, source: {3}, selfId: {4}", (childId == m_Source), (childId == SelfId), childId, m_Source, SelfId );
                                 continue;           // skip our source
-                            }
 
                             // look for an existing node first..
                             Node child = null;
@@ -142,12 +203,9 @@ namespace IBM.Watson.Self.Utils
 
                             if ( child == null )
                             {
-                                
                                 // no existing node found, create one..
                                 child = new Node(m_Explorer);
-
                                 m_Children.Add( child );
-                                Log.Debug( "SelfExplorer", "New child added {0} - \nQuery: {1}", child, m_Info );
 
                                 if ( m_Explorer.OnNodeAdded != null )
                                     m_Explorer.OnNodeAdded( child );
@@ -175,7 +233,6 @@ namespace IBM.Watson.Self.Utils
 
                         if (! bFoundChild )
                         {
-                            Log.Debug( "SelfExplorer", "Removing child {0} - \nQuery: {1}", child, m_Info );
                             if ( m_Explorer.OnNodeRemoved != null )
                                 m_Explorer.OnNodeRemoved( child );
                             remove.Add( child );
@@ -189,6 +246,9 @@ namespace IBM.Watson.Self.Utils
                 {
                     Log.Error( "SelfExplorer", "Failed to query {0}", m_Path );
                     m_bError = true;
+
+                    if (  m_Explorer.Root == this )
+                        Runnable.Run( OnRetryRefresh() );
                 }
 
                 if ( m_Explorer.OnNodeReady != null )
@@ -199,10 +259,20 @@ namespace IBM.Watson.Self.Utils
 
             public override string ToString()
             {
-                return string.Format("[Node: IsReady={0}, IsError={1}, Parent={2}, Children Count={3}, Path={4}, Info={5}, GroupId={6}, SelfId={7}, ParentId={8}]", IsReady, IsError, Parent, (Children != null)? Children.Count.ToString() : " - ", Path, Info, GroupId, SelfId, ParentId);
+                return string.Format("[Node: IsReady={0}, IsError={1}, Parent={2}, Children Count={3}, Path={4}, Info={5}, GroupId={6}, SelfId={7}, ParentId={8}]",
+                    IsReady, IsError, Parent, (Children != null)? Children.Count.ToString() : " - ", Path, Info, GroupId, SelfId, ParentId);
             }
 
+            private IEnumerator OnRetryRefresh( float a_fTime = 5.0f )
+            {
+                DateTime start = DateTime.Now;
+                while( (DateTime.Now - start).TotalSeconds < a_fTime )
+                    yield return null;
 
+                Log.Status( "SelfExplorer", "Retrying refresh!" );
+                Refresh( m_Path, m_Source );
+                yield break;
+            }
         }
         public delegate void OnNode( Node a_Node );
         public delegate void OnDone( SelfExplorer a_Explorer );

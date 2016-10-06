@@ -67,7 +67,7 @@ namespace IBM.Watson.Self.Topics
 
             public IDictionary ParseJson()
             {
-                if ( m_ParsedJson == null )
+                if ( m_ParsedJson == null && Data != null )
                     m_ParsedJson = Json.Deserialize( Encoding.UTF8.GetString( Data ) ) as IDictionary;
 
                 return m_ParsedJson;

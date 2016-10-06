@@ -160,7 +160,7 @@ namespace IBM.Watson.Self.Agents
 
         void OnBlackBoardEvent( TopicClient.Payload a_Payload )
         {
-            IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( a_Payload.Data ) ) as IDictionary;
+            IDictionary json = a_Payload.ParseJson();
 
             bool bFailed = false;
             string event_name = json["event"] as string;
