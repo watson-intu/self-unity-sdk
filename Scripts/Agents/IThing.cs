@@ -15,10 +15,10 @@
 *
 */
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using IBM.Watson.Self.Utils;
-using System;
 using IBM.Watson.DeveloperCloud.Utilities;
 
 namespace IBM.Watson.Self.Agents
