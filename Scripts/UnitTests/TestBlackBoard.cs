@@ -80,8 +80,7 @@ namespace IBM.Watson.Self.UnitTests
         private void OnConnected()
         {
             Log.Debug( "TestBlackBoard", "OnConnected" );
-            m_Client.Target = m_TargetPath;
-            BlackBoard.Instance.SubscribeToType( "Text", OnText );
+            BlackBoard.Instance.SubscribeToType( "Text", OnText, a_Path:m_TargetPath );
             m_ConnectionClosed = false;
         }
 
