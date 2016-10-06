@@ -66,7 +66,7 @@ namespace IBM.Watson.Self.Agents
             TopicClient.Instance.Unsubscribe( "blackboard", OnBlackBoardEvent );
         }
 
-        public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL )
+        public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL, string a_Path = "" )
         {
             if (!m_SubscriberMap.ContainsKey(a_Type))
             {
@@ -77,13 +77,13 @@ namespace IBM.Watson.Self.Agents
                 subscribe["type"] = a_Type;
                 subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
 
-                TopicClient.Instance.Publish("blackboard", Json.Serialize(subscribe));
+                TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(subscribe));
             }
 
             m_SubscriberMap[a_Type].Add( new Subscriber( a_Callback, a_EventMask ) );
         }
 
-        public void UnsubscribeFromType( string a_Type, OnThingEvent a_Callback = null )
+        public void UnsubscribeFromType( string a_Type, OnThingEvent a_Callback = null, string a_Path = "" )
         {
             if ( m_SubscriberMap.ContainsKey( a_Type ) )
             {
@@ -111,7 +111,7 @@ namespace IBM.Watson.Self.Agents
                 unsubscribe["event"] = "unsubscribe_from_type";
                 unsubscribe["type"] = a_Type;
 
-                TopicClient.Instance.Publish("blackboard", Json.Serialize(unsubscribe));
+                TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(unsubscribe));
             }
         }
         #endregion

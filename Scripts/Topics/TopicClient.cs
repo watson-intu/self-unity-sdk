@@ -165,7 +165,6 @@ namespace IBM.Watson.Self.Topics
         public ClientState State { get { return m_eState; } private set{ m_eState = value; lock (m_StateList) m_StateList.Add(value); } }
         public string GroupId { get { return m_GroupId; } }
         public string SelfId { get { return m_SelfId; } }
-        public string Target { get; set; }
         public bool Authenticated { get { return m_bAuthenticated; } }
 
         public OnStateStateChanged StateChangedEvent {get;set;}
@@ -307,7 +306,7 @@ namespace IBM.Watson.Self.Topics
             bool a_bPersisted = false)
         {
             Dictionary<string,object> publish = new Dictionary<string, object>();
-            publish["targets"] = new string[] { Target + a_Path };
+            publish["targets"] = new string[] { a_Path };
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = false;
@@ -323,7 +322,7 @@ namespace IBM.Watson.Self.Topics
             bool a_bPersisted = false )
         {
             Dictionary<string,object> publish = new Dictionary<string, object>();
-            publish["targets"] = new string[] { Target + a_Path };
+            publish["targets"] = new string[] { a_Path };
             publish["msg"] = "publish_at";
             publish["data"] = a_Data;
             publish["binary"] = true;
@@ -340,7 +339,7 @@ namespace IBM.Watson.Self.Topics
             m_QueryRequestMap[ reqId ] = a_Callback;
 
             Dictionary<string, object> query = new Dictionary<string, object>();
-            query["targets"] = new string[] { Target + a_Path };
+            query["targets"] = new string[] { a_Path };
             query["msg"] = "query";
             query["request"] = reqId;
 
@@ -353,7 +352,7 @@ namespace IBM.Watson.Self.Topics
         public void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
         {
-            string path = Target + a_Path;
+            string path = a_Path;
             if (! m_SubscriptionMap.ContainsKey( path ) )
                 m_SubscriptionMap[ path ] = new List<Subscription>();
             m_SubscriptionMap[ path ].Add( new Subscription( path, a_Callback ) );
@@ -369,7 +368,7 @@ namespace IBM.Watson.Self.Topics
         public bool Unsubscribe( string a_Path,
             OnPayload a_Callback = null)
         {
-            string path = Target + a_Path;
+            string path = a_Path;
 
             bool bSuccess = false;
 
