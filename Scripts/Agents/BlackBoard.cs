@@ -139,6 +139,47 @@ namespace IBM.Watson.Self.Agents
 
             TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(add_object) );
         }
+        public void RemoveThing( string a_GUID, string a_Path = "" )
+        {
+            Dictionary<string,object> remove_object = new Dictionary<string, object>();
+            remove_object["event"] = "remove_object";
+            remove_object["thing_guid"] = a_GUID;
+
+            TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(remove_object) );
+        }
+        public void RemoveThing( IThing a_Thing, string a_Path = "" )
+        {
+            RemoveThing( a_Thing.GUID, a_Path );
+        }
+        public void SetState( string a_GUID, string a_State, string a_Path = "" )
+        {
+            Dictionary<string,object> set_object = new Dictionary<string, object>();
+            set_object["event"] = "set_object_state";
+            set_object["thing_guid"] = a_GUID;
+            set_object["state"] = a_State;
+
+            TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
+        }
+        public void SetState( IThing a_Thing, string a_State, string a_Path = "" )
+        {
+            a_Thing.State = a_State;
+            SetState( a_Thing.GUID, a_State, a_Path );
+        }
+        public void SetImportance( string a_GUID, double a_Importance, string a_Path = "" )
+        {
+            Dictionary<string,object> set_object = new Dictionary<string, object>();
+            set_object["event"] = "set_object_importance";
+            set_object["thing_guid"] = a_GUID;
+            set_object["importance"] = a_Importance;
+
+            TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
+        }
+        public void SetImportance( IThing a_Thing, double a_Importance, string a_Path = "" )
+        {
+            a_Thing.Importance = a_Importance;
+            SetImportance( a_Thing.GUID, a_Importance, a_Path );
+        }
+
         #endregion
 
         #region Event Handlers
@@ -209,7 +250,8 @@ namespace IBM.Watson.Self.Agents
                 te.m_Thing = new IThing();
                 try {
                     te.m_Thing.Deserialize( json["thing"] as IDictionary );
-                    Log.Debug( "BlackBoard", "Adding object {0}", te.m_Thing.GUID );
+                    te.m_Thing.Origin = a_Payload.Origin;
+                    Log.Debug( "BlackBoard", "Adding object {0} from {1}", te.m_Thing.GUID, te.m_Thing.Origin );
 
                     if ( json.Contains( "parent" ) )
                         te.m_Thing.ParentGUID = json["parent"] as string;
@@ -265,7 +307,7 @@ namespace IBM.Watson.Self.Agents
                 json["failed_event"] = event_name;
                 json["event"] = "error";
 
-                TopicClient.Instance.Publish( "blackboard", Json.Serialize( json ) );
+                TopicClient.Instance.Publish( a_Payload.Origin, Json.Serialize( json ) );
             }
             else if ( te.m_EventType != ThingEventType.TE_NONE )
             {

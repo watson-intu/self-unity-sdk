@@ -61,6 +61,7 @@ namespace IBM.Watson.Self.Agents
         public string DataType { get; set; }        
         public IDictionary Data { get; set; }
         public string ParentGUID { get; set; }
+        public string Origin { get; set; }
         #endregion
 
         #region ISerializable interface
