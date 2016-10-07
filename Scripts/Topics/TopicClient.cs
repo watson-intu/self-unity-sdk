@@ -354,14 +354,17 @@ namespace IBM.Watson.Self.Topics
         {
             string path = a_Path;
             if (! m_SubscriptionMap.ContainsKey( path ) )
+            {
                 m_SubscriptionMap[ path ] = new List<Subscription>();
+
+                Dictionary<string,object> sub = new Dictionary<string, object>();
+                sub["targets"] = new string[] { path };
+                sub["msg"] = "subscribe";
+        
+                SendMessage( sub );
+            }
+
             m_SubscriptionMap[ path ].Add( new Subscription( path, a_Callback ) );
-
-            Dictionary<string,object> sub = new Dictionary<string, object>();
-            sub["targets"] = new string[] { path };
-            sub["msg"] = "subscribe";
-
-            SendMessage( sub );
         }
 
         //! Unsubscribe from the given topic

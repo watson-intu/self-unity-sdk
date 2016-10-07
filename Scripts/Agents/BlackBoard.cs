@@ -16,15 +16,14 @@
 *
 */
 
-
+using System;
+using System.Collections.Generic;
+using System.Collections;
 using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.Self.Topics;
-using System.Collections.Generic;
-using MiniJSON;
-using System.Text;
-using System.Collections;
 using IBM.Watson.DeveloperCloud.Logging;
-using System;
+
+using MiniJSON;
 
 namespace IBM.Watson.Self.Agents
 {
@@ -37,18 +36,19 @@ namespace IBM.Watson.Self.Agents
         #region Private Data
         private class Subscriber
         {
-            public Subscriber( OnThingEvent a_Callback, ThingEventType a_EventMask )
+            public Subscriber( OnThingEvent a_Callback, ThingEventType a_EventMask, string a_Path )
             {
                 m_Callback = a_Callback;
                 m_EventMask = a_EventMask;
+                m_Path = a_Path;
             }
 
             public OnThingEvent m_Callback;
             public ThingEventType m_EventMask;
+            public string m_Path;
         }
-        private Dictionary<string,List<Subscriber>>   m_SubscriberMap = new Dictionary<string, List<Subscriber>>();
+        private Dictionary<string,Dictionary<string,List<Subscriber>>> m_SubscriberMap = new Dictionary<string,Dictionary<string, List<Subscriber>>>();
         private Dictionary<string,IThing> m_ThingMap = new Dictionary<string, IThing>();
-        private Dictionary<string,bool> m_Blackboard= new Dictionary<string, bool>();
         private bool m_bDisconnected = false;
         #endregion
 
@@ -64,21 +64,22 @@ namespace IBM.Watson.Self.Agents
         {
             TopicClient.Instance.StateChangedEvent -= OnStateChanged;
 
-            foreach( var kv in m_Blackboard )
+            foreach( var kv in m_SubscriberMap )
                 TopicClient.Instance.Unsubscribe( kv.Key + "blackboard", OnBlackBoardEvent );
         }
 
         public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL, string a_Path = "" )
         {
-            if (! m_Blackboard.ContainsKey(a_Path) )
+            if (! m_SubscriberMap.ContainsKey(a_Path) )
             {
                 TopicClient.Instance.Subscribe( a_Path + "blackboard", OnBlackBoardEvent );
-                m_Blackboard[ a_Path ] = true;
+                m_SubscriberMap[ a_Path ] = new Dictionary<string, List<Subscriber>>();
             }
 
-            if (!m_SubscriberMap.ContainsKey(a_Type))
+            Dictionary<string,List<Subscriber>> types = m_SubscriberMap[ a_Path ];
+            if (!types.ContainsKey(a_Type))
             {
-                m_SubscriberMap[a_Type] = new List<Subscriber>();
+                types[a_Type] = new List<Subscriber>();
 
                 Dictionary<string, object> subscribe = new Dictionary<string, object>();
                 subscribe["event"] = "subscribe_to_type";
@@ -88,38 +89,42 @@ namespace IBM.Watson.Self.Agents
                 TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(subscribe));
             }
 
-            m_SubscriberMap[a_Type].Add( new Subscriber( a_Callback, a_EventMask ) );
+            types[a_Type].Add( new Subscriber( a_Callback, a_EventMask, a_Path ) );
         }
 
         public void UnsubscribeFromType( string a_Type, OnThingEvent a_Callback = null, string a_Path = "" )
         {
-            if ( m_SubscriberMap.ContainsKey( a_Type ) )
+            if ( m_SubscriberMap.ContainsKey( a_Path ) )
             {
-                if ( a_Callback != null )
+                Dictionary<string,List<Subscriber>> types = m_SubscriberMap[ a_Path ];
+                if ( types.ContainsKey( a_Type ) )
                 {
-                    List<Subscriber> subs = m_SubscriberMap[ a_Type ];
-                    for(int i=0;i<subs.Count;++i)
-                        if ( subs[i].m_Callback == a_Callback )
-                        {
-                            subs.RemoveAt(i);
-                            break;
-                        }
+                    if ( a_Callback != null )
+                    {
+                        List<Subscriber> subs = types[ a_Type ];
+                        for(int i=0;i<subs.Count;++i)
+                            if ( subs[i].m_Callback == a_Callback )
+                            {
+                                subs.RemoveAt(i);
+                                break;
+                            }
 
-                    if ( subs.Count == 0 )
-                        m_SubscriberMap.Remove( a_Type );
+                        if ( subs.Count == 0 )
+                            types.Remove( a_Type );
+                    }
+                    else
+                        types.Remove( a_Type );
                 }
-                else
-                    m_SubscriberMap.Remove( a_Type );
-            }
 
-            // only remove if this was the last subscriber for the given type..
-            if (!m_SubscriberMap.ContainsKey(a_Type))
-            {
-                Dictionary<string, object> unsubscribe = new Dictionary<string, object>();
-                unsubscribe["event"] = "unsubscribe_from_type";
-                unsubscribe["type"] = a_Type;
+                // only remove if this was the last subscriber for the given type..
+                if (!types.ContainsKey(a_Type))
+                {
+                    Dictionary<string, object> unsubscribe = new Dictionary<string, object>();
+                    unsubscribe["event"] = "unsubscribe_from_type";
+                    unsubscribe["type"] = a_Type;
 
-                TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(unsubscribe));
+                    TopicClient.Instance.Publish( a_Path + "blackboard", Json.Serialize(unsubscribe));
+                }
             }
         }
 
@@ -158,17 +163,23 @@ namespace IBM.Watson.Self.Agents
             if (m_bDisconnected)
             {
                 // restore our subscriptions..
-                foreach (var kv in m_SubscriberMap)
+                foreach (var path in m_SubscriberMap)
                 {
-                    string type = kv.Key;
+                    TopicClient.Instance.Subscribe( path.Key + "blackboard", OnBlackBoardEvent );
 
-                    Dictionary<string, object> subscribe = new Dictionary<string, object>();
-                    subscribe["event"] = "subscribe_to_type";
-                    subscribe["type"] = type;
-                    subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
+                    Dictionary<string,List<Subscriber>> types = path.Value;
+                    foreach( var kv in types )
+                    {
+                        string type = kv.Key;
 
-                    TopicClient.Instance.Publish("blackboard", Json.Serialize(subscribe));
-                    Log.Status("BlackBoard", "Subscription to type {0} restored.", type );
+                        Dictionary<string, object> subscribe = new Dictionary<string, object>();
+                        subscribe["event"] = "subscribe_to_type";
+                        subscribe["type"] = type;
+                        subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
+
+                        TopicClient.Instance.Publish( path.Key + "blackboard", Json.Serialize(subscribe));
+                        Log.Status("BlackBoard", "Subscription to type {0} restored.", type );
+                    }
                 }
                 m_bDisconnected = false;
             }
@@ -258,18 +269,21 @@ namespace IBM.Watson.Self.Agents
             }
             else if ( te.m_EventType != ThingEventType.TE_NONE )
             {
-                List<Subscriber> subs = null;
-                if ( m_SubscriberMap.TryGetValue( type, out subs ) )
+                foreach( var path in m_SubscriberMap )
                 {
-                    for(int i=0;i<subs.Count;++i)
+                    List<Subscriber> subs = null;
+                    if ( path.Value.TryGetValue( type, out subs ) )
                     {
-                        Subscriber sub = subs[i];
-                        if ( sub.m_Callback == null )
-                            continue;
-                        if ( (sub.m_EventMask & te.m_EventType) == 0 )
-                            continue;
+                        for(int i=0;i<subs.Count;++i)
+                        {
+                            Subscriber sub = subs[i];
+                            if ( sub.m_Callback == null )
+                                continue;
+                            if ( (sub.m_EventMask & te.m_EventType) == 0 )
+                                continue;
 
-                        sub.m_Callback( te );
+                            sub.m_Callback( te );
+                        }
                     }
                 }
             }
