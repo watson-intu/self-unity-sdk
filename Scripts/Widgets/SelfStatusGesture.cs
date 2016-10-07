@@ -16,11 +16,12 @@
 */
 
 using IBM.Watson.DeveloperCloud.Widgets;
+using IBM.Watson.Self.Gestures;
 using System;
 using System.Collections;
 using UnityEngine;
 
-namespace IBM.Watson.Self.Gestures
+namespace IBM.Watson.Self.Widgets
 {
     public class SelfStatusGesture : Widget, IGesture
     {
