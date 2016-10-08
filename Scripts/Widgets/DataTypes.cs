@@ -16,9 +16,8 @@
 */
 
 using IBM.Watson.DeveloperCloud.Widgets;
-using System.Collections;
 
-namespace IBM.Watson.Self.Gestures
+namespace IBM.Watson.Self.Widgets
 {
     /// <summary>
     /// This data class is for status data output by the SelfStatusGesture.
@@ -60,19 +59,19 @@ namespace IBM.Watson.Self.Gestures
     public class DocumentModel : Widget.Data
     {
         #region Private Data
-        private string m_DocumentType = null;
-        private IDictionary m_Document = null;
+        private string m_Type = null;
+        private object m_Document = null;
         #endregion
 
         #region Public Properties
-        public string DocumentType { get { return m_DocumentType; } }
-        public IDictionary Document { get { return m_Document; } }
+        public string Type { get { return m_Type; } set { m_Type = value; } }
+        public object Document { get { return m_Document; } set { m_Document = value; } }
         #endregion
 
         #region Public Functions
-        public DocumentModel(string a_DocumentType, IDictionary a_Document)
+        public DocumentModel(string a_DocumentType, object a_Document)
         {
-            m_DocumentType = a_DocumentType;
+            m_Type = a_DocumentType;
             m_Document = a_Document;
         }
         #endregion

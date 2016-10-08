@@ -1,7 +1,4 @@
-﻿
-
-using IBM.Watson.DeveloperCloud.Logging;
-/**
+﻿/**
 * Copyright 2016 IBM Corp. All Rights Reserved.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,13 +14,15 @@ using IBM.Watson.DeveloperCloud.Logging;
 * limitations under the License.
 *
 */
-using IBM.Watson.DeveloperCloud.Widgets;
-using MiniJSON;
+
 using System;
 using System.Collections;
 using UnityEngine;
+using IBM.Watson.DeveloperCloud.Widgets;
+using IBM.Watson.DeveloperCloud.Logging;
+using IBM.Watson.Self.Gestures;
 
-namespace IBM.Watson.Self.Gestures
+namespace IBM.Watson.Self.Widgets
 {
     public class SelfDisplayGesture : Widget, IGesture
     {
@@ -82,36 +81,9 @@ namespace IBM.Watson.Self.Gestures
             string type = a_Params["display"] as string;
             string data = a_Params["data"] as string;
 
-            object document = Json.Deserialize(data);
-            if ( document != null )
+            if (! m_DocumentOutput.SendData( new DocumentModel( type, data ) ) )
             {
-                if ( document is IList )
-                {
-                    IList document_list = document as IList;
-                    foreach( var doc in document_list )
-                    {
-                        if ( !(doc is IDictionary) )
-                            continue;
-
-                        if (! m_DocumentOutput.SendData( new DocumentModel( type, doc as IDictionary ) ) )
-                        {
-                            Log.Error( "SelfDisplayGesture", "Failed to send data." );
-                            bError = true;
-                        }
-                    }
-                }
-                else if ( document is IDictionary )
-                {
-                    if (! m_DocumentOutput.SendData( new DocumentModel( type, document as IDictionary ) ) )
-                    {
-                        Log.Error( "SelfDisplayGesture", "Failed to send data." );
-                        bError = true;
-                    }
-                }
-            }
-            else
-            {
-                Log.Error( "SelfDisplayGesture", "document data not json format: {0}", data );
+                Log.Error( "SelfDisplayGesture", "Failed to send data." );
                 bError = true;
             }
 

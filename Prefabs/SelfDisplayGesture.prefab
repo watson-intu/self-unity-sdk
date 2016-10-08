@@ -19,7 +19,7 @@ GameObject:
   serializedVersion: 4
   m_Component:
   - 4: {fileID: 4000014020568490}
-  - 114: {fileID: 114000014199605012}
+  - 114: {fileID: 114000012466614398}
   m_Layer: 0
   m_Name: SelfDisplayGesture
   m_TagString: Untagged
@@ -40,7 +40,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
---- !u!114 &114000014199605012
+--- !u!114 &114000012466614398
 MonoBehaviour:
   m_ObjectHideFlags: 1
   m_PrefabParentObject: {fileID: 0}
@@ -48,7 +48,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1000013858366688}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ce826b6d86140414ca2ed7636b454660, type: 3}
+  m_Script: {fileID: 11500000, guid: 85a3a8e3eae0b444abcbf4d836a2f773, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_AutoConnect: 1

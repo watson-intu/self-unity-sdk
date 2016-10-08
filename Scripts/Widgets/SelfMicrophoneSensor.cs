@@ -15,12 +15,12 @@
 *
 */
 
-using IBM.Watson.DeveloperCloud.Widgets;
-
 using System;
 using UnityEngine;
+using IBM.Watson.DeveloperCloud.Widgets;
+using IBM.Watson.Self.Sensors;
 
-namespace IBM.Watson.Self.Sensors
+namespace IBM.Watson.Self.Widgets
 {
     /// <summary>
     /// This widget works with the existing MicrophoneWidget from the Unity SDK
