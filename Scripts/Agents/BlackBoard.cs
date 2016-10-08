@@ -1,4 +1,5 @@
-﻿
+﻿//#define ENABLE_DEBUGGING
+
 /**
 * Copyright 2015 IBM Corp. All Rights Reserved.
 *
@@ -251,8 +252,9 @@ namespace IBM.Watson.Self.Agents
                 try {
                     te.m_Thing.Deserialize( json["thing"] as IDictionary );
                     te.m_Thing.Origin = a_Payload.Origin;
+#if ENABLE_DEBUGGING
                     Log.Debug( "BlackBoard", "Adding object {0} from {1}", te.m_Thing.GUID, te.m_Thing.Origin );
-
+#endif
                     if ( json.Contains( "parent" ) )
                         te.m_Thing.ParentGUID = json["parent"] as string;
                     m_ThingMap[ te.m_Thing.GUID ] = te.m_Thing;
@@ -270,11 +272,15 @@ namespace IBM.Watson.Self.Agents
                 string guid = json["thing_guid"] as string;
                 if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
                 {
+#if ENABLE_DEBUGGING
                     Log.Debug( "BlackBoard", "Removing object {0}", guid );
+#endif
                     m_ThingMap.Remove( guid );
                 }
+#if ENABLE_DEBUGGING
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
+                    Log.Debug( "BlackBoard", "Failed to find object by guid {0}.", guid );
+#endif
             }
             else if ( event_name == "set_object_state" )
             {
@@ -282,11 +288,15 @@ namespace IBM.Watson.Self.Agents
                 if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
                 {
                     string state = json["state"] as string;
-                    Log.Status( "BlackBoard", "Updating object {0} state to {1}", guid, state );
+#if ENABLE_DEBUGGING
+                    Log.Debug( "BlackBoard", "Updating object {0} state to {1}", guid, state );
+#endif
                     te.m_Thing.State = json["state"] as string;
                 }
+#if ENABLE_DEBUGGING
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
+                    Log.Debug( "BlackBoard", "Failed to find object by guid {0}.", guid );
+#endif
             }
             else if ( event_name == "set_object_importance" )
             {
@@ -294,11 +304,15 @@ namespace IBM.Watson.Self.Agents
                 if ( m_ThingMap.TryGetValue( guid, out te.m_Thing ) )
                 {
                     float fImportance = (float)json["importance"];
-                    Log.Status( "BlackBoard", "Updating object {0} importance to {1}", guid, fImportance );
+#if ENABLE_DEBUGGING
+                    Log.Debug( "BlackBoard", "Updating object {0} importance to {1}", guid, fImportance );
+#endif
                     te.m_Thing.Importance = fImportance;
                 }
+#if ENABLE_DEBUGGING
                 else
-                    Log.Warning( "BlackBoard", "Failed to find object by guid {0}.", guid );
+                    Log.Debug( "BlackBoard", "Failed to find object by guid {0}.", guid );
+#endif
             }
 
             // if we failed, send the message back with a different event
