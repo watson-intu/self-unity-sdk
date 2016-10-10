@@ -16,6 +16,7 @@
 */
 
 using IBM.Watson.DeveloperCloud.Widgets;
+using System;
 
 namespace IBM.Watson.Self.Widgets
 {
@@ -61,18 +62,24 @@ namespace IBM.Watson.Self.Widgets
         #region Private Data
         private string m_Type = null;
         private object m_Document = null;
+        private string m_GroupId = null;
         #endregion
 
         #region Public Properties
         public string Type { get { return m_Type; } set { m_Type = value; } }
         public object Document { get { return m_Document; } set { m_Document = value; } }
+        public string GroupId { get { return m_GroupId; } set { m_GroupId = value; } }
         #endregion
 
         #region Public Functions
-        public DocumentModel(string a_DocumentType, object a_Document)
+        public DocumentModel(string a_DocumentType, object a_Document, string a_GroupId = null )
         {
             m_Type = a_DocumentType;
             m_Document = a_Document;
+
+            if ( string.IsNullOrEmpty( a_GroupId ) )
+                a_GroupId = Guid.NewGuid().ToString();
+            m_GroupId = a_GroupId;
         }
         #endregion
 
