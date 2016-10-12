@@ -17,6 +17,7 @@
 
 using IBM.Watson.DeveloperCloud.Widgets;
 using System;
+using UnityEngine;
 
 namespace IBM.Watson.Self.Widgets
 {
@@ -57,11 +58,15 @@ namespace IBM.Watson.Self.Widgets
     /// This class is the container for the data of a document. The DocumentType property is matched
     /// against a matching DocumentUI object to get displayed.
     /// </summary>
+    [Serializable]
     public class DocumentModel : Widget.Data
     {
         #region Private Data
+        [SerializeField]
         private string m_Type = null;
+        [SerializeField]
         private object m_Document = null;
+        [SerializeField]
         private string m_GroupId = null;
         #endregion
 
