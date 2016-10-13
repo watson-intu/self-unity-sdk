@@ -106,7 +106,7 @@ namespace IBM.Watson.Self.Widgets
         }
         #endregion
 
-        private void OnSpeakingInput(Data data)
+        private void OnSpeakingState(Data data)
         {
             SpeakingStateData state = data as SpeakingStateData;
             if ( state != null )
