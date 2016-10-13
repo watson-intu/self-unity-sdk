@@ -31,10 +31,13 @@ namespace IBM.Watson.Self.Widgets
         [SerializeField]
         private Output m_TextOutput = new Output(typeof(TextToSpeechData), true);
         [SerializeField]
+        private Input m_SpeakingInput = new Input( "Speaking Input", typeof(SpeakingStateData), "OnSpeakingState" );
+        [SerializeField]
         private string m_GestureId = "tts";
         [SerializeField]
         private bool m_Override = true;
         private string m_InstanceId = Guid.NewGuid().ToString();
+        private OnGestureDone m_Callback = null;
         #endregion
 
         #region MonoBehavior interface
@@ -76,8 +79,9 @@ namespace IBM.Watson.Self.Widgets
         //! Execute this gesture, the provided callback should be invoked when the gesture is complete.
         public bool Execute(OnGestureDone a_Callback, IDictionary a_Params)
         {
-            bool bError = false;
+            m_Callback = a_Callback;
 
+            bool bError = false;
             string text = a_Params["text"] as string;
             string gender = a_Params["gender"] as string;
             string language = a_Params["language"] as string;
@@ -86,8 +90,13 @@ namespace IBM.Watson.Self.Widgets
             if (string.IsNullOrEmpty(text) || !m_TextOutput.SendData(new TextToSpeechData(text)))
                 bError = true;
 
-            if (a_Callback != null)
-                a_Callback(this, bError);
+            if ( bError )
+            {
+                if ( m_Callback != null )
+                    m_Callback(this, true );
+                m_Callback = null;
+            }
+
             return true;
         }
         //! Abort this gesture, if true is returned then abort succeeded and callback will NOT be invoked.
@@ -96,5 +105,18 @@ namespace IBM.Watson.Self.Widgets
             return true;
         }
         #endregion
+
+        private void OnSpeakingInput(Data data)
+        {
+            SpeakingStateData state = data as SpeakingStateData;
+            if ( state != null )
+            {
+                if ( !state.Boolean )
+                {
+                    if (m_Callback != null)
+                        m_Callback(this, false);
+                }
+            }
+        }
     }
 }
