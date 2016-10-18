@@ -207,7 +207,8 @@ namespace IBM.Watson.Self.Agents
                 // restore our subscriptions..
                 foreach (var path in m_SubscriberMap)
                 {
-                    TopicClient.Instance.Subscribe( path.Key + "blackboard", OnBlackBoardEvent );
+                    if (! TopicClient.Instance.IsSubscribed( path.Key + "blackboard", OnBlackBoardEvent ) )
+                        TopicClient.Instance.Subscribe( path.Key + "blackboard", OnBlackBoardEvent );
 
                     Dictionary<string,List<Subscriber>> types = path.Value;
                     foreach( var kv in types )

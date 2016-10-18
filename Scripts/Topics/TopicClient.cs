@@ -348,6 +348,24 @@ namespace IBM.Watson.Self.Topics
             Runnable.Run( QueryTimeout( reqId, a_fTimeout ) );
         }
 
+        public bool IsSubscribed( string a_Path, OnPayload a_Callback = null )
+        {
+            if ( m_SubscriptionMap.ContainsKey( a_Path ) )
+            {
+                if ( a_Callback != null )
+                {
+                    foreach( var cb in m_SubscriptionMap[ a_Path ] )
+                        if ( cb.m_Callback == a_Callback )
+                            return true;
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
         //! Subscribe to the given topic specified by the provided path.
         public void Subscribe( string a_Path,      //! The topic to subscribe, ".." moves up to a parent self
             OnPayload a_Callback)
