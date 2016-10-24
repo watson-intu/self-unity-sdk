@@ -136,6 +136,7 @@ namespace IBM.Watson.Self.Topics
         string          m_Host = null;
         string          m_GroupId = null;
         string          m_SelfId = null;
+        string          m_orgId = null;
         bool            m_bAuthenticated = false;
         string          m_ParentId = null;
         WebSocket       m_Socket = null;
@@ -180,7 +181,8 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host = null,
             string a_GroupId = null,
-            string a_selfId = null )
+            string a_selfId = null,
+            string a_orgId = null)
         {
             if ( m_eState != ClientState.Inactive 
                 && m_eState != ClientState.Disconnected )
@@ -197,6 +199,8 @@ namespace IBM.Watson.Self.Topics
                 a_GroupId = Config.Instance.GetVariableValue("GroupID");
             if (string.IsNullOrEmpty(a_selfId))
                 a_selfId = Config.Instance.GetVariableValue("SelfID");
+            if (string.IsNullOrEmpty(a_orgId))
+                a_orgId = Config.Instance.GetVariableValue("OrgID");
 
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
@@ -209,6 +213,8 @@ namespace IBM.Watson.Self.Topics
             State = ClientState.Connecting;
             m_GroupId = a_GroupId;
             m_SelfId = a_selfId;
+            m_orgId = a_orgId;
+
             m_bAuthenticated = false;
 
             if (string.IsNullOrEmpty(m_SelfId))
@@ -235,6 +241,7 @@ namespace IBM.Watson.Self.Topics
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("groupId", m_GroupId );
             m_Socket.Headers.Add("selfId", m_SelfId );
+            m_Socket.Headers.Add("orgId", m_orgId);
 
             m_Socket.OnMessage += OnSocketMessage;
             m_Socket.OnOpen += OnSocketOpen;
