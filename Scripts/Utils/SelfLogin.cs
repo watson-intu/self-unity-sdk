@@ -27,7 +27,7 @@ namespace IBM.Watson.Self.Utils
     public class SelfLogin
     {
         #region Public Types
-        public delegate void OnRegistered( string a_GroupId, string a_SelfId );
+        public delegate void OnRegistered( string a_SelfId, string a_Token );
         public delegate void OnError();
         #endregion
 
@@ -105,12 +105,12 @@ namespace IBM.Watson.Self.Utils
             {
                 Log.Status( "SelfLogin", "Embodiment Registered: {0}", a_EmbodimentId );
 
-                Token = a_Token;
                 SelfId = a_EmbodimentId;
+                Token = a_Token;
                 SaveConfig();
 
                 if ( OnRegisteredEvent != null )
-                    OnRegisteredEvent( GroupId, SelfId );
+                    OnRegisteredEvent( SelfId, Token );
             }
             else
             {

@@ -213,8 +213,8 @@ namespace IBM.Watson.Self.Topics
                 return false;
             }
 
-            m_Host = a_Host;
             State = ClientState.Connecting;
+            m_Host = a_Host;
             m_SelfId = a_selfId;
             m_Token = a_Token;
             m_bAuthenticated = false;
@@ -261,9 +261,10 @@ namespace IBM.Watson.Self.Topics
                 m_StateChangeRoutine = Runnable.Run( OnStateChange() );
         }
 
-        private void OnRegisteredEmbodiment( string a_GroupId, string a_SelfId )
+        private void OnRegisteredEmbodiment( string a_SelfId, string a_Token )
         {
             m_SelfId = a_SelfId;
+            m_Token = a_Token;
             m_Login = null;
 
             DoConnect();
@@ -304,6 +305,7 @@ namespace IBM.Watson.Self.Topics
             {
                 State = ClientState.Closing;
                 m_Socket.CloseAsync();
+                m_Socket = null;
             }
         }
 
@@ -572,7 +574,7 @@ namespace IBM.Watson.Self.Topics
                                 string selfId = json["selfId"] as string;
                                 //string token = json["token"] as string;
 
-                                Log.Status("TopicClient", "Received authenicate control, selfId: {1}", selfId);
+                                Log.Status("TopicClient", "Received authenicate control, selfId: {0}", selfId);
                                 // TODO actually authenticate the other end?
                                 m_ParentId = selfId;
                                 m_bAuthenticated = true;
