@@ -205,8 +205,6 @@ namespace IBM.Watson.Self.Topics
                 a_Token = Config.Instance.GetVariableValue("BearerToken");
             if (string.IsNullOrEmpty(a_selfId))
                 a_selfId = Config.Instance.GetVariableValue("SelfID");
-            if (string.IsNullOrEmpty(a_orgId))
-                a_orgId = Config.Instance.GetVariableValue("OrgID");
 
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
