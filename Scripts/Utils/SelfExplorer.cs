@@ -53,7 +53,6 @@ namespace IBM.Watson.Self.Utils
             public List<Node> Children { get { return m_Children; } }
             public string Path { get { return m_Path; } }
             public TopicClient.QueryInfo Info { get { return m_Info; } }
-            public string GroupId { get { return m_Info != null ? m_Info.GroupId : ""; } }
             public string SelfId { get { return m_Info != null ? m_Info.SelfId : ""; } }
             public string ParentId { get { return m_Info != null ? m_Info.ParentId : ""; } }
             #endregion
@@ -94,7 +93,6 @@ namespace IBM.Watson.Self.Utils
                     string event_name = json["event"] as string;
                     if ( event_name == "connected" )
                     {
-                        string groupId = json["groupId"] as string;
                         string selfId = json["selfId"] as string;
 
                         if ( (bool)json["parent"] )
@@ -121,7 +119,6 @@ namespace IBM.Watson.Self.Utils
                     }
                     else if ( event_name == "disconnected" )
                     {
-                        string groupId = json["groupId"] as string;
                         string selfId = json["selfId"] as string;
                     
                         if ( Parent != null && Parent.SelfId == selfId )
@@ -259,8 +256,8 @@ namespace IBM.Watson.Self.Utils
 
             public override string ToString()
             {
-                return string.Format("[Node: IsReady={0}, IsError={1}, Parent={2}, Children Count={3}, Path={4}, Info={5}, GroupId={6}, SelfId={7}, ParentId={8}]",
-                    IsReady, IsError, Parent, (Children != null)? Children.Count.ToString() : " - ", Path, Info, GroupId, SelfId, ParentId);
+                return string.Format("[Node: IsReady={0}, IsError={1}, Parent={2}, Children Count={3}, Path={4}, Info={5}, SelfId={6}, ParentId={7}]",
+                    IsReady, IsError, Parent, (Children != null)? Children.Count.ToString() : " - ", Path, Info, SelfId, ParentId);
             }
 
             private IEnumerator OnRetryRefresh( float a_fTime = 5.0f )
