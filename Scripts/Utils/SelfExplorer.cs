@@ -44,6 +44,8 @@ namespace IBM.Watson.Self.Utils
             private TopicClient.QueryInfo m_Info = null;
             private string m_Source = null;       // selfId of who created this node, so we don't backtrack 
             private bool m_bError = false;
+            private bool m_bSubscribed = false;
+            private int m_RetryRoutine = -1;
             #endregion
 
             #region Public Properties
@@ -68,6 +70,20 @@ namespace IBM.Watson.Self.Utils
 
                 m_Explorer.m_PendingRequests += 1;
                 TopicClient.Instance.Query( m_Path, OnQueryResponse );
+            }
+
+            public void Stop()
+            {
+                if ( m_bSubscribed )
+                {
+                    TopicClient.Instance.Unsubscribe( m_Path + "topic-manager", OnTopicManagerEvent );
+                    m_bSubscribed = false;
+                }
+                if ( m_RetryRoutine >= 0 )
+                {
+                    Runnable.Stop( m_RetryRoutine );
+                    m_RetryRoutine = -1;
+                }
             }
 
             public Node( SelfExplorer a_Explorer )
@@ -155,6 +171,7 @@ namespace IBM.Watson.Self.Utils
                 if ( m_Info != null )
                 {
                     TopicClient.Instance.Subscribe( m_Path + "topic-manager", OnTopicManagerEvent );
+                    m_bSubscribed = true;
 
                     if (! string.IsNullOrEmpty( m_Info.ParentId ) )
                     {
@@ -245,7 +262,7 @@ namespace IBM.Watson.Self.Utils
                     m_bError = true;
 
                     if (  m_Explorer.Root == this )
-                        Runnable.Run( OnRetryRefresh() );
+                        m_RetryRoutine = Runnable.Run( OnRetryRefresh() );
                 }
 
                 if ( m_Explorer.OnNodeReady != null )
@@ -266,6 +283,7 @@ namespace IBM.Watson.Self.Utils
                 while( (DateTime.Now - start).TotalSeconds < a_fTime )
                     yield return null;
 
+                m_RetryRoutine = -1;
                 Log.Status( "SelfExplorer", "Retrying refresh!" );
                 Refresh( m_Path, m_Source );
                 yield break;
@@ -287,8 +305,17 @@ namespace IBM.Watson.Self.Utils
         #region Public Functions
         public void Explore( string a_StartTarget = "" )
         {
+            if ( Root != null )
+                Root.Stop();
+
             Root = new Node(this);
             Root.Refresh( a_StartTarget, TopicClient.Instance.SelfId );
+        }
+
+        public void Stop()
+        {
+            if ( Root != null )
+                Root.Stop();
         }
 
         public override string ToString()
