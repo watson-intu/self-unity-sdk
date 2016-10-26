@@ -46,6 +46,7 @@ namespace IBM.Watson.Self.Utils
             private bool m_bError = false;
             private bool m_bSubscribed = false;
             private int m_RetryRoutine = -1;
+            private bool m_Active = false;
             #endregion
 
             #region Public Properties
@@ -64,6 +65,7 @@ namespace IBM.Watson.Self.Utils
             /// </summary>
             public void Refresh( string a_Path, string a_Source )
             {
+                m_Active = true;
                 m_Path = a_Path;
                 m_Source = a_Source;
                 m_bError = false;
@@ -74,6 +76,8 @@ namespace IBM.Watson.Self.Utils
 
             public void Stop()
             {
+                m_Active = false;
+
                 if ( m_bSubscribed )
                 {
                     TopicClient.Instance.Unsubscribe( m_Path + "topic-manager", OnTopicManagerEvent );
@@ -256,7 +260,7 @@ namespace IBM.Watson.Self.Utils
                     foreach( Node purge in remove )
                         m_Children.Remove( purge );
                 }
-                else
+                else if(m_Active)
                 {
                     Log.Error( "SelfExplorer", "Failed to query {0}", m_Path );
                     m_bError = true;
