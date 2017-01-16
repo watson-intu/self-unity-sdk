@@ -146,6 +146,7 @@ namespace IBM.Watson.Self.Topics
         string          m_Token = null;
         bool            m_bAuthenticated = false;
         string          m_ParentId = null;
+		bool			m_ParentInstance = true;
         WebSocket       m_Socket = null;
         ClientState     m_eState = ClientState.Inactive;
         List<IDictionary>    
@@ -188,7 +189,8 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host = null,
             string a_selfId = null,
-            string a_Token = null )
+            string a_Token = null,
+			bool a_ParentInstance = true)
         {
             if ( m_eState != ClientState.Inactive 
                 && m_eState != ClientState.Disconnected )
@@ -217,6 +219,7 @@ namespace IBM.Watson.Self.Topics
             m_Host = a_Host;
             m_SelfId = a_selfId;
             m_Token = a_Token;
+			m_ParentInstance = a_ParentInstance;
             m_bAuthenticated = false;
 
             if (string.IsNullOrEmpty(m_SelfId))
@@ -243,6 +246,7 @@ namespace IBM.Watson.Self.Topics
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("selfId", m_SelfId );
             m_Socket.Headers.Add("token", m_Token );
+			m_Socket.Headers.Add ("parentInstance", Convert.ToString(m_ParentInstance));
 
             m_Socket.OnMessage += OnSocketMessage;
             m_Socket.OnOpen += OnSocketOpen;
