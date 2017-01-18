@@ -146,6 +146,7 @@ namespace IBM.Watson.Self.Topics
         string          m_Token = null;
         bool            m_bAuthenticated = false;
         string          m_ParentId = null;
+		string			m_ParentInstance = null;
         WebSocket       m_Socket = null;
         ClientState     m_eState = ClientState.Inactive;
         List<IDictionary>    
@@ -188,7 +189,8 @@ namespace IBM.Watson.Self.Topics
 
         public bool Connect( string a_Host = null,
             string a_selfId = null,
-            string a_Token = null )
+            string a_Token = null,
+			string a_ParentInstance = null)
         {
             if ( m_eState != ClientState.Inactive 
                 && m_eState != ClientState.Disconnected )
@@ -205,6 +207,8 @@ namespace IBM.Watson.Self.Topics
                 a_Token = Config.Instance.GetVariableValue("BearerToken");
             if (string.IsNullOrEmpty(a_selfId))
                 a_selfId = Config.Instance.GetVariableValue("SelfID");
+			if (string.IsNullOrEmpty(a_ParentInstance))
+				a_ParentInstance = Config.Instance.GetVariableValue("ParentInstance");
 
             if (! a_Host.StartsWith( "ws://", StringComparison.CurrentCultureIgnoreCase )
                 && a_Host.StartsWith( "wss://", StringComparison.CurrentCultureIgnoreCase ) )
@@ -217,6 +221,7 @@ namespace IBM.Watson.Self.Topics
             m_Host = a_Host;
             m_SelfId = a_selfId;
             m_Token = a_Token;
+			m_ParentInstance = a_ParentInstance;
             m_bAuthenticated = false;
 
             if (string.IsNullOrEmpty(m_SelfId))
@@ -243,6 +248,7 @@ namespace IBM.Watson.Self.Topics
             m_Socket.Headers = new Dictionary<string, string>();
             m_Socket.Headers.Add("selfId", m_SelfId );
             m_Socket.Headers.Add("token", m_Token );
+			m_Socket.Headers.Add ("parentInstance", m_ParentInstance);
 
             m_Socket.OnMessage += OnSocketMessage;
             m_Socket.OnOpen += OnSocketOpen;
