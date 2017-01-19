@@ -34,11 +34,8 @@ namespace IBM.Watson.Self.Widgets
 	public class SelfRemoteSpeechGesture : Widget
 	{
 		#region Private Data
-//		[SerializeField]
-//		private Output m_TextOutput = new Output(typeof(TextToSpeechData), true);
 		[SerializeField]
-		private Input m_SpeakingInput = new Input( "Speaking Input", typeof(SpeakingStateData), "OnSpeakingState" );
-//		private OnGestureDone m_Callback = null;
+		private Output m_Status = new Output( typeof(StatusData), true );
 		#endregion
 
 		#region MonoBehavior interface
@@ -78,8 +75,6 @@ namespace IBM.Watson.Self.Widgets
 			float[] floatArr = new float[array.Length / 2];
 			for (int i = 0; i < floatArr.Length; i++) 
 			{
-//				if (!BitConverter.IsLittleEndian) 
-//					Array.Reverse(array, i * 2, 2);
 				floatArr [i] = (float)BitConverter.ToInt16 (array, i * 2) / 32768.0f;
 			}
 			return floatArr;
@@ -89,16 +84,22 @@ namespace IBM.Watson.Self.Widgets
 		{
 			if (Application.isPlaying && clip != null)
 			{
+				m_Status.SendData( new StatusData("ANSWERING"));
 				GameObject audioObject = new GameObject("AudioObject");
 				AudioSource source = audioObject.AddComponent<AudioSource>();
 				source.spatialBlend = 0.0f;     // 2D sound
 				source.loop = false;            // do not loop
 				source.clip = clip;             // clip
 				source.Play();
-
 				// automatically destroy the object after the sound has played..
 				GameObject.Destroy(audioObject, clip.length);
+				Invoke ("onClipFinished", clip.length);
 			}
+		}
+
+		private void onClipFinished() 
+		{
+			m_Status.SendData (new StatusData ("LISTENING"));
 		}
 
 			
