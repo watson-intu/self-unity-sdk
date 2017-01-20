@@ -36,6 +36,8 @@ namespace IBM.Watson.Self.Widgets
 		#region Private Data
 		[SerializeField]
 		private Output m_Status = new Output( typeof(StatusData), true );
+		[SerializeField]
+		private Output m_DisableMic = new Output(typeof(DisableMicData));
 		#endregion
 
 		#region MonoBehavior interface
@@ -85,6 +87,7 @@ namespace IBM.Watson.Self.Widgets
 			if (Application.isPlaying && clip != null)
 			{
 				m_Status.SendData( new StatusData("ANSWERING"));
+				m_DisableMic.SendData(new DisableMicData(true));
 				GameObject audioObject = new GameObject("AudioObject");
 				AudioSource source = audioObject.AddComponent<AudioSource>();
 				source.spatialBlend = 0.0f;     // 2D sound
@@ -100,6 +103,7 @@ namespace IBM.Watson.Self.Widgets
 		private void onClipFinished() 
 		{
 			m_Status.SendData (new StatusData ("LISTENING"));
+			m_DisableMic.SendData(new DisableMicData(false));
 		}
 
 			
