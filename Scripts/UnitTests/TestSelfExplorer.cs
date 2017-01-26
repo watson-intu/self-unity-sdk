@@ -19,7 +19,6 @@ using System.Collections;
 using IBM.Watson.DeveloperCloud.UnitTests;
 using IBM.Watson.Self.Topics;
 using IBM.Watson.DeveloperCloud.Logging;
-using System.Text;
 using IBM.Watson.Self.Utils;
 
 namespace IBM.Watson.Self.UnitTests
