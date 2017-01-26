@@ -17,9 +17,9 @@
 
 using System.Collections;
 using IBM.Watson.DeveloperCloud.UnitTests;
-using IBM.Watson.Self.Topics;
 using IBM.Watson.DeveloperCloud.Logging;
 using IBM.Watson.Self.Utils;
+using UnityEngine;
 
 namespace IBM.Watson.Self.UnitTests
 {
@@ -34,7 +34,14 @@ namespace IBM.Watson.Self.UnitTests
 
             m_Discovery.StartDiscovery();
             while(! m_bDiscoveryTested )
+            {
+                if (! Application.isPlaying )
+                {
+                    m_Discovery.StopDiscovery();
+                    yield break;
+                }
                 yield return null;
+            }
 
             yield break;
         }

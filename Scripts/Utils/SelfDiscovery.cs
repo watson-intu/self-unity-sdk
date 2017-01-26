@@ -34,7 +34,7 @@ namespace IBM.Watson.Self.Utils
         #region Private Data
         private string m_MulticastAddress = "239.255.0.1";
         private int m_Port = 9444;
-        private UdpClient m_Client = null;
+        private Socket m_Socket = null;
         private Thread m_ReceiveThread = null;
         private List<Instance> m_Discovered = new List<Instance>();
         #endregion
@@ -62,20 +62,24 @@ namespace IBM.Watson.Self.Utils
         #endregion
 
         #region Public Properties
-        public OnInstance OnDiscovered { get; set; }
+        public OnInstance OnDiscovered { get; set; }                            // callback invoked from the non-main thread
         public List<Instance> Discovered { get { return m_Discovered; } }       // the user should lock this list before accessing
         #endregion
 
         #region Public Functions
         public void StartDiscovery()
         {
+            IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
+            IPEndPoint broadcastEnd = new IPEndPoint( multicastAddr, m_Port );
+
             m_Discovered.Clear();
-            if( m_Client == null )
+            if( m_Socket == null )
             {
-                m_Client = new UdpClient( m_Port );
-                m_Client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true );
-                //m_Client.Client.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
-                m_Client.JoinMulticastGroup( IPAddress.Parse( m_MulticastAddress ) );
+                m_Socket = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
+                m_Socket.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.ReuseAddress, true );
+                m_Socket.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
+                m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
+                m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
 
                 m_ReceiveThread = new Thread( ReceiveThread );
                 m_ReceiveThread.Start();
@@ -84,26 +88,34 @@ namespace IBM.Watson.Self.Utils
             Dictionary<string,object> message = new Dictionary<string, object>();
             message["action"] = "ping";
 
-            IPEndPoint broadcast = new IPEndPoint( IPAddress.Parse( m_MulticastAddress ), m_Port );
             byte [] packet = Encoding.UTF8.GetBytes( Json.Serialize( message ) );
-            m_Client.Send( packet, packet.Length, broadcast );
+            m_Socket.SendTo( packet, broadcastEnd );
         }
         public void StopDiscovery()
         {
-            m_Client.Close();
-            m_Client = null;
+            if ( m_ReceiveThread != null )
+            {
+                m_ReceiveThread.Abort();
+                m_ReceiveThread = null;
+            }
+            if ( m_Socket != null )
+            {
+                m_Socket.Close();
+                m_Socket = null;
+            }
         }
         #endregion
 
         #region Private Functions
         private void ReceiveThread()
         {
-            while( m_Client != null )
+            while( m_Socket != null )
             {
                 IPEndPoint remoteEP = new IPEndPoint( IPAddress.Any, 0 );
-                byte [] data = m_Client.Receive( ref remoteEP );
+                byte [] data = new byte[ 1024 ];
+                m_Socket.Receive( data );
 
-                if ( data != null )
+                if ( data.Length > 0 )
                 {
                     IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( data ) ) as IDictionary;
                     if ( json != null )
@@ -121,11 +133,9 @@ namespace IBM.Watson.Self.Utils
                             instance.LastPing = DateTime.Now;
 
                             lock( m_Discovered )
-                            {
                                 m_Discovered.Add( instance );
-                                if ( OnDiscovered != null )
-                                    OnDiscovered( instance );
-                            }
+                            if ( OnDiscovered != null )
+                                OnDiscovered( instance );
                         }
                     }
                 }
