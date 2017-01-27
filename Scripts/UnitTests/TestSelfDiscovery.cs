@@ -26,32 +26,36 @@ namespace IBM.Watson.Self.UnitTests
     public class TestSelfDiscovery : UnitTest
     {
         bool m_bDiscoveryTested = false;
-        SelfDiscovery m_Discovery = new SelfDiscovery();
+        int m_WaitForConnection = 2;
 
         public override IEnumerator RunTest()
         {
-            m_Discovery.OnDiscovered += OnDiscovered;
+            m_WaitForConnection = 2;
+            m_bDiscoveryTested = false;
 
-            m_Discovery.StartDiscovery();
+            if(SelfDiscovery.Instance.OnDiscovered == null)
+                SelfDiscovery.Instance.OnDiscovered += OnDiscovered;
+
+            SelfDiscovery.Instance.StartDiscovery();
+
             while(! m_bDiscoveryTested )
             {
-                if (! Application.isPlaying )
-                {
-                    m_Discovery.StopDiscovery();
-                    yield break;
-                }
                 yield return null;
             }
 
             yield break;
         }
 
-        private void OnDiscovered( SelfDiscovery.Instance a_Instance )
+        private void OnDiscovered( SelfDiscovery.SelfInstance a_Instance )
         {
             Log.Debug( "TestSelfDiscovery", "OnNodeAdded: {0}", a_Instance );
-            m_Discovery.StopDiscovery();
-            m_bDiscoveryTested = true;
-            Test(true);
+            m_WaitForConnection--;
+            if (m_WaitForConnection <= 0)
+            {
+                SelfDiscovery.Instance.StopDiscovery();
+                m_bDiscoveryTested = true;
+                Test(true);
+            }
         }
     }
 }

@@ -24,6 +24,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using IBM.Watson.DeveloperCloud.Logging;
+using IBM.Watson.DeveloperCloud.Utilities;
 
 namespace IBM.Watson.Self.Utils
 {
@@ -35,13 +36,17 @@ namespace IBM.Watson.Self.Utils
         #region Private Data
         private string m_MulticastAddress = "239.255.0.1";
         private int m_Port = 9444;
-        private Socket m_Socket = null;
+        private int m_MulstiCastTTL = 5;
         private Thread m_ReceiveThread = null;
-        private List<Instance> m_Discovered = new List<Instance>();
+        private List<SelfInstance> m_Discovered = new List<SelfInstance>();
+
+        private int m_NumberOfInstances = 0;
+        private UdpClient m_UdpClient = null;
+        private int m_AsyncDiscoveredID = -1;
         #endregion
 
         #region Public Types
-        public class Instance
+        public class SelfInstance
         {
             #region Public Properties
             public string Name { get; set; }
@@ -60,96 +65,116 @@ namespace IBM.Watson.Self.Utils
                     Name, Type, MacId, EmbodimentId, InstanceId, GroupId, OrgId, LastPing );
             }
         }
-        public delegate void OnInstance( Instance a_Instance );
+        public delegate void OnInstance( SelfInstance a_Instance );
         #endregion
 
         #region Public Properties
+        public static SelfDiscovery Instance { get { return Singleton<SelfDiscovery>.Instance; } }
         public OnInstance OnDiscovered { get; set; }                            // callback invoked from the non-main thread
-        public List<Instance> Discovered { get { return m_Discovered; } }       // the user should lock this list before accessing
+        public List<SelfInstance> Discovered { get { return m_Discovered; } }       // the user should lock this list before accessing
         #endregion
 
         ~SelfDiscovery() 
         {
-            Log.Debug("SelfDiscovery", "Destructor entered");
-            if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
-            {
-                Log.Debug("SelfDiscovery", "Aborting receive thread");
-                m_ReceiveThread.Abort();
-            }
+            StopDiscovery();
         }
 
         public void OnApplicationQuit()
         {
-            if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
-            {
-                Log.Debug("SelfDiscovery", "Aborting receive thread");
-                m_ReceiveThread.Abort();
-            }
+            StopDiscovery();
         }
 
         #region Public Functions
         public void StartDiscovery()
         {
-            Log.Debug("SelfDiscovery", "Discovery started with address: {0} and port {1}", m_MulticastAddress, m_Port);
-            IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
-            IPEndPoint broadcastEnd = new IPEndPoint( multicastAddr, m_Port );
-
+            Log.Debug("SelfDiscovery", "Discovery started with multicast address: {0} and port {1}", m_MulticastAddress, m_Port);
             m_Discovered.Clear();
-            if( m_Socket == null )
-            {
-                m_Socket = new Socket( AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp );
-                m_Socket.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.ReuseAddress, true );
-                m_Socket.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
-                m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
-                m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
+            m_NumberOfInstances = 0;
 
-                Log.Debug("SelfDiscovery", "Started listening UDP started with address: {0} and port {1}", m_MulticastAddress, m_Port);
+            if (m_UdpClient == null)
+            {
+                IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
+                m_UdpClient = new UdpClient();
+                m_UdpClient.ExclusiveAddressUse = true;
+                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.ReuseAddress, true );
+                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.Broadcast, true );
+                m_UdpClient.Client.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
+                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
+                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
 
                 if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
                     m_ReceiveThread.Abort();
-                
+
                 m_ReceiveThread = new Thread( () => ReceiveThread() );
                 m_ReceiveThread.IsBackground = true;
                 m_ReceiveThread.Start();
+
+                m_AsyncDiscoveredID = Runnable.Run(AsyncOnDiscovered());
             }
 
+            Log.Debug("SelfDiscovery", "Broadcasting Ping");
             Dictionary<string,object> message = new Dictionary<string, object>();
             message["action"] = "ping";
-
-            Log.Debug("SelfDiscovery", "Sending Action as Ping as broadcast");
             byte [] packet = Encoding.UTF8.GetBytes( Json.Serialize( message ) );
-            m_Socket.SendTo( packet, broadcastEnd );
+            m_UdpClient.EnableBroadcast = true;
+            m_UdpClient.Send(packet, packet.Length, new IPEndPoint(IPAddress.Broadcast, m_Port));
+
         }
+
         public void StopDiscovery()
         {
-            Log.Debug( "TestSelfDiscovery", "Stopping Receive thread" );
-            if ( m_ReceiveThread != null )
+            if (m_AsyncDiscoveredID >= 0)
             {
-                m_ReceiveThread.Abort();
-                m_ReceiveThread = null;
-            }
-            Log.Debug( "TestSelfDiscovery", "Stopping Socket Connection" );
-            if ( m_Socket != null )
-            {
-                m_Socket.Close();
-                m_Socket = null;
+                Log.Debug( "SelfDiscovery", "Stopping discover co-routine" );
+                Runnable.Stop(m_AsyncDiscoveredID);
+                m_AsyncDiscoveredID = -1;
             }
 
-            Log.Debug( "TestSelfDiscovery", "Stopped Discovery" );
+            if ( m_ReceiveThread != null && m_ReceiveThread.IsAlive)
+            {
+                Log.Debug( "SelfDiscovery", "Stopping Receive thread" );
+                m_ReceiveThread.Abort();
+            }
+
+            if (m_UdpClient != null)
+            {
+                Log.Debug( "SelfDiscovery", "Stopping UDP Client" );
+                m_UdpClient.Close();
+                m_UdpClient = null;
+            }
         }
         #endregion
 
         #region Private Functions
+
+        private IEnumerator AsyncOnDiscovered()
+        {
+            while (m_UdpClient != null)
+            {
+                if (m_NumberOfInstances != m_Discovered.Count)
+                {
+                    for (int i = m_NumberOfInstances; i < m_Discovered.Count; i++)
+                    {
+                        if (OnDiscovered != null)
+                            OnDiscovered(m_Discovered[i]);
+
+                        m_NumberOfInstances++;
+                    }
+                }
+                yield return null;
+            }
+            yield break;
+           
+        }
+
         private void ReceiveThread()
         {
-            Log.Debug("SelfDiscovery", "Started listening in thread");
+            Log.Debug("SelfDiscovery", "Started listening UDP broadcast to port {0}", m_Port);
 
-            while( m_Socket != null )
+            while (m_UdpClient != null)
             {
-                IPEndPoint remoteEP = new IPEndPoint( IPAddress.Any, 0 );
-                byte [] data = new byte[ 1024 ];
-                m_Socket.Receive( data );
-
+                IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, m_Port);
+                byte[] data = m_UdpClient.Receive(ref remoteEP);
                 if ( data.Length > 0 )
                 {
                     IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( data ) ) as IDictionary;
@@ -158,7 +183,7 @@ namespace IBM.Watson.Self.Utils
                         string action = json["action"] as string;
                         if (action == "pong")
                         {
-                            Instance instance = new Instance();
+                            SelfInstance instance = new SelfInstance();
                             instance.Name = json["name"] as string;
                             instance.Type = json["type"] as string;
                             instance.MacId = json["macId"] as string;
@@ -168,12 +193,15 @@ namespace IBM.Watson.Self.Utils
                             instance.OrgId = json["orgId"] as string;
                             instance.LastPing = DateTime.Now;
 
-                            Log.Debug("SelfDiscovery", "Received pong message from Intu : {0}", instance);
+                            Log.Debug("SelfDiscovery", "Received Pong message from Intu : {0} from IP: {1}", instance,remoteEP.ToString());
 
                             lock (m_Discovered)
-                                m_Discovered.Add(instance);
-                            if (OnDiscovered != null)
-                                OnDiscovered(instance);
+                            {
+                                if(!m_Discovered.Exists( e => e.InstanceId == instance.InstanceId))
+                                {
+                                    m_Discovered.Add(instance);
+                                }
+                            }
                         }
                         else
                         {
@@ -182,7 +210,7 @@ namespace IBM.Watson.Self.Utils
                     }
                     else
                     {
-                        Log.Debug("SelfDiscovery", "Received some data but not in JSON format so ignoring it.");
+                        Log.Error("SelfDiscovery", "Received some data but not in JSON format so ignoring it. Message: \n{0}",  Encoding.UTF8.GetString( data ));
                     }
                 }
             }
