@@ -49,7 +49,9 @@ namespace IBM.Watson.Self.UnitTests
         private void OnDiscovered( SelfDiscovery.Instance a_Instance )
         {
             Log.Debug( "TestSelfDiscovery", "OnNodeAdded: {0}", a_Instance );
+            m_Discovery.StopDiscovery();
             m_bDiscoveryTested = true;
+            Test(true);
         }
     }
 }

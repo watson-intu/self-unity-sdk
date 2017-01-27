@@ -23,6 +23,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using IBM.Watson.DeveloperCloud.Logging;
 
 namespace IBM.Watson.Self.Utils
 {
@@ -46,6 +47,7 @@ namespace IBM.Watson.Self.Utils
             public string Name { get; set; }
             public string Type { get; set; }
             public string MacId { get; set; }
+            public string EmbodimentId { get; set; }
             public string InstanceId { get; set; }
             public string GroupId { get; set; }
             public string OrgId { get; set; }
@@ -54,8 +56,8 @@ namespace IBM.Watson.Self.Utils
 
             public override string ToString()
             {
-                return string.Format("[Instance: Name={0}, Type={1}, MacId={2}, InstanceId={3}, GroupId={4}, OrgId={5}, LastPing={6}]",
-                    Name, Type, MacId, InstanceId, GroupId, OrgId, LastPing );
+                return string.Format("[Instance: Name={0}, Type={1}, MacId={2}, EmbodimentId={3}, InstanceId={4}, GroupId={5}, OrgId={6}, LastPing={7}]",
+                    Name, Type, MacId, EmbodimentId, InstanceId, GroupId, OrgId, LastPing );
             }
         }
         public delegate void OnInstance( Instance a_Instance );
@@ -66,9 +68,29 @@ namespace IBM.Watson.Self.Utils
         public List<Instance> Discovered { get { return m_Discovered; } }       // the user should lock this list before accessing
         #endregion
 
+        ~SelfDiscovery() 
+        {
+            Log.Debug("SelfDiscovery", "Destructor entered");
+            if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
+            {
+                Log.Debug("SelfDiscovery", "Aborting receive thread");
+                m_ReceiveThread.Abort();
+            }
+        }
+
+        public void OnApplicationQuit()
+        {
+            if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
+            {
+                Log.Debug("SelfDiscovery", "Aborting receive thread");
+                m_ReceiveThread.Abort();
+            }
+        }
+
         #region Public Functions
         public void StartDiscovery()
         {
+            Log.Debug("SelfDiscovery", "Discovery started with address: {0} and port {1}", m_MulticastAddress, m_Port);
             IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
             IPEndPoint broadcastEnd = new IPEndPoint( multicastAddr, m_Port );
 
@@ -81,34 +103,47 @@ namespace IBM.Watson.Self.Utils
                 m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
                 m_Socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
 
-                m_ReceiveThread = new Thread( ReceiveThread );
+                Log.Debug("SelfDiscovery", "Started listening UDP started with address: {0} and port {1}", m_MulticastAddress, m_Port);
+
+                if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
+                    m_ReceiveThread.Abort();
+                
+                m_ReceiveThread = new Thread( () => ReceiveThread() );
+                m_ReceiveThread.IsBackground = true;
                 m_ReceiveThread.Start();
             }
 
             Dictionary<string,object> message = new Dictionary<string, object>();
             message["action"] = "ping";
 
+            Log.Debug("SelfDiscovery", "Sending Action as Ping as broadcast");
             byte [] packet = Encoding.UTF8.GetBytes( Json.Serialize( message ) );
             m_Socket.SendTo( packet, broadcastEnd );
         }
         public void StopDiscovery()
         {
+            Log.Debug( "TestSelfDiscovery", "Stopping Receive thread" );
             if ( m_ReceiveThread != null )
             {
                 m_ReceiveThread.Abort();
                 m_ReceiveThread = null;
             }
+            Log.Debug( "TestSelfDiscovery", "Stopping Socket Connection" );
             if ( m_Socket != null )
             {
                 m_Socket.Close();
                 m_Socket = null;
             }
+
+            Log.Debug( "TestSelfDiscovery", "Stopped Discovery" );
         }
         #endregion
 
         #region Private Functions
         private void ReceiveThread()
         {
+            Log.Debug("SelfDiscovery", "Started listening in thread");
+
             while( m_Socket != null )
             {
                 IPEndPoint remoteEP = new IPEndPoint( IPAddress.Any, 0 );
@@ -118,28 +153,41 @@ namespace IBM.Watson.Self.Utils
                 if ( data.Length > 0 )
                 {
                     IDictionary json = Json.Deserialize( Encoding.UTF8.GetString( data ) ) as IDictionary;
-                    if ( json != null )
+                    if (json != null)
                     {
                         string action = json["action"] as string;
-                        if ( action == "pong" )
+                        if (action == "pong")
                         {
                             Instance instance = new Instance();
                             instance.Name = json["name"] as string;
                             instance.Type = json["type"] as string;
                             instance.MacId = json["macId"] as string;
+                            instance.EmbodimentId = json["embodimentId"] as string;
                             instance.InstanceId = json["instanceId"] as string;
                             instance.GroupId = json["groupId"] as string;
                             instance.OrgId = json["orgId"] as string;
                             instance.LastPing = DateTime.Now;
 
-                            lock( m_Discovered )
-                                m_Discovered.Add( instance );
-                            if ( OnDiscovered != null )
-                                OnDiscovered( instance );
+                            Log.Debug("SelfDiscovery", "Received pong message from Intu : {0}", instance);
+
+                            lock (m_Discovered)
+                                m_Discovered.Add(instance);
+                            if (OnDiscovered != null)
+                                OnDiscovered(instance);
                         }
+                        else
+                        {
+                            Log.Debug("SelfDiscovery", "Received JSON data but not pong action. Action is : {0}", action);
+                        }
+                    }
+                    else
+                    {
+                        Log.Debug("SelfDiscovery", "Received some data but not in JSON format so ignoring it.");
                     }
                 }
             }
+
+            Log.Debug("SelfDiscovery", "Finished listening ");
         }
         #endregion
     }
