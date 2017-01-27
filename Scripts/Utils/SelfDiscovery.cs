@@ -36,7 +36,6 @@ namespace IBM.Watson.Self.Utils
         #region Private Data
         private string m_MulticastAddress = "239.255.0.1";
         private int m_Port = 9444;
-        private int m_MulstiCastTTL = 5;
         private Thread m_ReceiveThread = null;
         private List<SelfInstance> m_Discovered = new List<SelfInstance>();
 
@@ -74,6 +73,7 @@ namespace IBM.Watson.Self.Utils
         public List<SelfInstance> Discovered { get { return m_Discovered; } }       // the user should lock this list before accessing
         #endregion
 
+        #region Destructor to Stop Discovery
         ~SelfDiscovery() 
         {
             StopDiscovery();
@@ -83,6 +83,7 @@ namespace IBM.Watson.Self.Utils
         {
             StopDiscovery();
         }
+        #endregion
 
         #region Public Functions
         public void StartDiscovery()
