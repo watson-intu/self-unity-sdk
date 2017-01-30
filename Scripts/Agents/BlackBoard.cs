@@ -292,7 +292,7 @@ namespace IBM.Watson.Self.Agents
 #if ENABLE_DEBUGGING
                     Log.Debug( "BlackBoard", "Updating object {0} state to {1}", guid, state );
 #endif
-                    te.m_Thing.State = json["state"] as string;
+                    te.m_Thing.State = state;
                 }
 #if ENABLE_DEBUGGING
                 else
