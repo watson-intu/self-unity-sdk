@@ -38,7 +38,7 @@ namespace IBM.Watson.Self.Utils
         private int m_Port = 9444;
         private Thread m_ReceiveThread = null;
         private List<SelfInstance> m_Discovered = new List<SelfInstance>();
-
+        private int m_IPMulticastTimeToLive = 5;
         private int m_NumberOfInstances = 0;
         private UdpClient m_UdpClient = null;
         private int m_AsyncDiscoveredID = -1;
@@ -51,6 +51,7 @@ namespace IBM.Watson.Self.Utils
             public string Name { get; set; }
             public string Type { get; set; }
             public string MacId { get; set; }
+            public string IPv4 { get; set; }
             public string EmbodimentId { get; set; }
             public string InstanceId { get; set; }
             public string GroupId { get; set; }
@@ -60,8 +61,8 @@ namespace IBM.Watson.Self.Utils
 
             public override string ToString()
             {
-                return string.Format("[Instance: Name={0}, Type={1}, MacId={2}, EmbodimentId={3}, InstanceId={4}, GroupId={5}, OrgId={6}, LastPing={7}]",
-                    Name, Type, MacId, EmbodimentId, InstanceId, GroupId, OrgId, LastPing );
+                return string.Format("[SelfInstance: Name={0}, Type={1}, MacId={2}, IPv4={3}, EmbodimentId={4}, InstanceId={5}, GroupId={6}, OrgId={7}, LastPing={8}]", 
+                    Name, Type, MacId, IPv4, EmbodimentId, InstanceId, GroupId, OrgId, LastPing);
             }
         }
         public delegate void OnInstance( SelfInstance a_Instance );
@@ -101,7 +102,7 @@ namespace IBM.Watson.Self.Utils
                 m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.Broadcast, true );
                 m_UdpClient.Client.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
                 m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
-                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
+                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, m_IPMulticastTimeToLive);
 
                 if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
                     m_ReceiveThread.Abort();
@@ -188,6 +189,7 @@ namespace IBM.Watson.Self.Utils
                             instance.Name = json["name"] as string;
                             instance.Type = json["type"] as string;
                             instance.MacId = json["macId"] as string;
+                            instance.IPv4 = remoteEP.Address.ToString();
                             instance.EmbodimentId = json["embodimentId"] as string;
                             instance.InstanceId = json["instanceId"] as string;
                             instance.GroupId = json["groupId"] as string;
