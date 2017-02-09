@@ -289,6 +289,10 @@ namespace IBM.Watson.Self.Utils
 
                 m_RetryRoutine = -1;
                 Log.Status( "SelfExplorer", "Retrying refresh!" );
+
+                if (m_Explorer.OnExplorerRefresh != null)
+                    m_Explorer.OnExplorerRefresh(m_Explorer);
+                
                 Refresh( m_Path, m_Source );
                 yield break;
             }
@@ -304,6 +308,7 @@ namespace IBM.Watson.Self.Utils
         public OnNode OnNodeAdded { get; set; }
         public OnNode OnNodeRemoved { get; set; }
         public OnDone OnExplorerDone { get; set; }
+        public OnDone OnExplorerRefresh { get; set; }
         #endregion
 
         #region Public Functions
