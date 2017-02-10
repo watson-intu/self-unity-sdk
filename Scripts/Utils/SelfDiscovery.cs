@@ -52,6 +52,7 @@ namespace IBM.Watson.Self.Utils
             public string Type { get; set; }
             public string MacId { get; set; }
             public string IPv4 { get; set; }
+            public int Port { get; set; }
             public string EmbodimentId { get; set; }
             public string InstanceId { get; set; }
             public string GroupId { get; set; }
@@ -61,8 +62,8 @@ namespace IBM.Watson.Self.Utils
 
             public override string ToString()
             {
-                return string.Format("[SelfInstance: Name={0}, Type={1}, MacId={2}, IPv4={3}, EmbodimentId={4}, InstanceId={5}, GroupId={6}, OrgId={7}, LastPing={8}]", 
-                    Name, Type, MacId, IPv4, EmbodimentId, InstanceId, GroupId, OrgId, LastPing);
+                return string.Format("[SelfInstance: Name={0}, Type={1}, MacId={2}, IPv4={3}, Port={4}, EmbodimentId={5}, InstanceId={6}, GroupId={7}, OrgId={8}, LastPing={9}]", 
+                    Name, Type, MacId, IPv4, Port, EmbodimentId, InstanceId, GroupId, OrgId, LastPing);
             }
         }
         public delegate void OnInstance( SelfInstance a_Instance );
@@ -194,6 +195,8 @@ namespace IBM.Watson.Self.Utils
                             instance.InstanceId = json["instanceId"] as string;
                             instance.GroupId = json["groupId"] as string;
                             instance.OrgId = json["orgId"] as string;
+                            instance.Port = (int) json["port"];
+
                             instance.LastPing = DateTime.Now;
 
                             Log.Debug("SelfDiscovery", "Received Pong message from Intu : {0} from IP: {1}", instance,remoteEP.ToString());
