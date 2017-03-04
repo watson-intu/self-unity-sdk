@@ -67,8 +67,17 @@ namespace IBM.Watson.Self.Topics
 
             public IDictionary ParseJson()
             {
-                if ( m_ParsedJson == null && Data != null )
-                    m_ParsedJson = Json.Deserialize( Encoding.UTF8.GetString( Data ) ) as IDictionary;
+                if (m_ParsedJson == null && Data != null)
+                {
+                    try
+                    {
+                        m_ParsedJson = Json.Deserialize(Encoding.UTF8.GetString(Data)) as IDictionary;
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Exception", "Payload can't converted to JSON. Original text: {0}", Encoding.UTF8.GetString(Data));
+                    }
+                }
 
                 return m_ParsedJson;
             }
