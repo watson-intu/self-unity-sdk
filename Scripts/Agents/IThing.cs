@@ -63,9 +63,6 @@ namespace IBM.Watson.Self.Agents
         public string ParentGUID { get; set; }
         public string Origin { get; set; }
 
-        public IThing[] Children { get; set;}
-        public IDictionary Parameters { get; set; }
-
         #endregion
 
         #region ISerializable interface
@@ -87,24 +84,6 @@ namespace IBM.Watson.Self.Agents
                 DataType = a_Json["m_DataType"] as string;
             if ( a_Json.Contains( "m_Data" ) )
                 Data = a_Json["m_Data"] as IDictionary;
-            if (a_Json.Contains("m_Children"))
-            {
-                IList listChild = a_Json["m_Children"] as IList;
-                List<IThing> listIthing = new List<IThing>();
-
-                for (int i = 0; listChild != null && i < listChild.Count; i++)
-                {
-                    IThing child = new IThing();
-                    child.Deserialize(listChild[i] as IDictionary);
-                    listIthing.Add(child);
-                }
-
-                if(listIthing.Count > 0)
-                    Children = listIthing.ToArray();
-            }
-
-            if ( a_Json.Contains( "m_Params" ) )
-                Parameters = a_Json["m_Params"] as IDictionary;
         }
         public IDictionary Serialize()
         {
