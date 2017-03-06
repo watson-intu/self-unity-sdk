@@ -26,6 +26,7 @@ using WebSocketSharp;
 using IBM.Watson.DeveloperCloud.Connection;
 using IBM.Watson.Self.Services;
 using IBM.Watson.Self.Utils;
+using IBM.Watson.DeveloperCloud.Widgets;
 
 namespace IBM.Watson.Self.Topics
 {
@@ -820,4 +821,39 @@ namespace IBM.Watson.Self.Topics
         #endregion
     }
 
+    /// <summary>
+    /// This class is used for query Intu instances via TopicClient
+    /// </summary>
+    public class TopicClientData : Widget.Data
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="IBM.Watson.DeveloperCloud.DataTypes.TopicClientData"/> class.
+        /// </summary>
+        public TopicClientData()
+        {}
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="IBM.Watson.DeveloperCloud.DataTypes.TopicClientData"/> class.
+        /// </summary>
+        /// <param name="a_TopicClient">A topic client.</param>
+        public TopicClientData(TopicClient a_TopicClient)
+        {
+            TopicClient = a_TopicClient;
+        }
+
+        /// <summary>
+        /// Should return a print friendly name for this data.
+        /// </summary>
+        /// <returns>Returns a user-friendly name for this type of data.</returns>
+        public override string GetName()
+        {
+            return "TopicClient";
+        }
+
+        /// <summary>
+        /// Gets or sets the topic client.
+        /// </summary>
+        /// <value>The topic client.</value>
+        public TopicClient TopicClient { get; set; }
+    }
 }

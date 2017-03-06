@@ -20,8 +20,8 @@ using IBM.Watson.Self.Gestures;
 using System;
 using System.Collections;
 using UnityEngine;
-using IBM.Watson.DeveloperCloud.DataTypes;
 using IBM.Watson.DeveloperCloud.Utilities;
+using IBM.Watson.Self.Topics;
 
 namespace IBM.Watson.Self.Widgets
 {

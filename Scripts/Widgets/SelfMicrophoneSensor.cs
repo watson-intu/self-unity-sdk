@@ -19,9 +19,9 @@ using System;
 using UnityEngine;
 using IBM.Watson.DeveloperCloud.Widgets;
 using IBM.Watson.Self.Sensors;
-using IBM.Watson.DeveloperCloud.DataTypes;
 using IBM.Watson.DeveloperCloud.Utilities;
 using IBM.Watson.DeveloperCloud.Logging;
+using IBM.Watson.Self.Topics;
 
 namespace IBM.Watson.Self.Widgets
 {
