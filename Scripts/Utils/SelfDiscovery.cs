@@ -199,9 +199,7 @@ namespace IBM.Watson.Self.Utils
                             if (json.Contains("port"))
                             {
                                 int portNumber = 0;
-                                int.TryParse(json["port"].ToString(), out portNumber);
-
-                                if (portNumber != 0)
+                                if (int.TryParse(json["port"].ToString(), out portNumber) && portNumber != 0)
                                 {
                                     instance.Port = portNumber;
                                 }
