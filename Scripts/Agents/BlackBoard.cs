@@ -51,39 +51,36 @@ namespace IBM.Watson.Self.Agents
         private Dictionary<string,Dictionary<string,List<Subscriber>>> m_SubscriberMap = new Dictionary<string,Dictionary<string, List<Subscriber>>>();
         private Dictionary<string,IThing> m_ThingMap = new Dictionary<string, IThing>();
         private bool m_bDisconnected = false;
-        private TopicClient m_TopicClient = null;
+        #endregion
+
+        #region Public Properties
+        public TopicClient TopicClient { get; protected set;}
         #endregion
 
         #region Public Interface
-        public static BlackBoard Instance { get { return Singleton<BlackBoard>.Instance; } }
 
-        public BlackBoard(TopicClient topicClient)
+        public BlackBoard(TopicClient a_TopicClient)
         {
-            m_TopicClient = topicClient;
-            m_TopicClient.StateChangedEvent += OnStateChanged;
-        }
-
-        public BlackBoard()
-        {
-            if (m_TopicClient == null)
-                m_TopicClient = TopicClient.Instance;
+            if (a_TopicClient == null)
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
             
-            m_TopicClient.StateChangedEvent += OnStateChanged;
+            TopicClient = a_TopicClient;
+            TopicClient.StateChangedEvent += OnStateChanged;
         }
 
         ~BlackBoard()  // destructor to clean-up events listeners
         {
-            m_TopicClient.StateChangedEvent -= OnStateChanged;
+            TopicClient.StateChangedEvent -= OnStateChanged;
 
             foreach( var kv in m_SubscriberMap )
-                m_TopicClient.Unsubscribe( kv.Key + "blackboard", OnBlackBoardEvent );
+                TopicClient.Unsubscribe( kv.Key + "blackboard", OnBlackBoardEvent );
         }
 
         public void SubscribeToType( string a_Type, OnThingEvent a_Callback, ThingEventType a_EventMask = ThingEventType.TE_ALL, string a_Path = "" )
         {
             if (! m_SubscriberMap.ContainsKey(a_Path) )
             {
-                m_TopicClient.Subscribe( a_Path + "blackboard", OnBlackBoardEvent );
+                TopicClient.Subscribe( a_Path + "blackboard", OnBlackBoardEvent );
                 m_SubscriberMap[ a_Path ] = new Dictionary<string, List<Subscriber>>();
             }
 
@@ -97,7 +94,7 @@ namespace IBM.Watson.Self.Agents
                 subscribe["type"] = a_Type;
                 subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
 
-                m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(subscribe));
+                TopicClient.Publish( a_Path + "blackboard", Json.Serialize(subscribe));
             }
 
             types[a_Type].Add( new Subscriber( a_Callback, a_EventMask, a_Path ) );
@@ -134,7 +131,7 @@ namespace IBM.Watson.Self.Agents
                     unsubscribe["event"] = "unsubscribe_from_type";
                     unsubscribe["type"] = a_Type;
 
-                    m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(unsubscribe));
+                    TopicClient.Publish( a_Path + "blackboard", Json.Serialize(unsubscribe));
                 }
             }
         }
@@ -148,7 +145,7 @@ namespace IBM.Watson.Self.Agents
             if (!string.IsNullOrEmpty( a_Thing.ParentGUID ) )
                 add_object["parent"] = a_Thing.ParentGUID;
 
-            m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(add_object) );
+            TopicClient.Publish( a_Path + "blackboard", Json.Serialize(add_object) );
         }
         public void RemoveThing( string a_GUID, string a_Path = "" )
         {
@@ -156,7 +153,7 @@ namespace IBM.Watson.Self.Agents
             remove_object["event"] = "remove_object";
             remove_object["thing_guid"] = a_GUID;
 
-            m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(remove_object) );
+            TopicClient.Publish( a_Path + "blackboard", Json.Serialize(remove_object) );
         }
         public void RemoveThing( IThing a_Thing, string a_Path = "" )
         {
@@ -169,7 +166,7 @@ namespace IBM.Watson.Self.Agents
             set_object["thing_guid"] = a_GUID;
             set_object["state"] = a_State;
 
-            m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
+            TopicClient.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
         }
         public void SetState( IThing a_Thing, string a_State, string a_Path = "" )
         {
@@ -183,7 +180,7 @@ namespace IBM.Watson.Self.Agents
             set_object["thing_guid"] = a_GUID;
             set_object["importance"] = a_Importance;
 
-            m_TopicClient.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
+            TopicClient.Publish( a_Path + "blackboard", Json.Serialize(set_object) );
         }
         public void SetImportance( IThing a_Thing, double a_Importance, string a_Path = "" )
         {
@@ -217,8 +214,8 @@ namespace IBM.Watson.Self.Agents
                 // restore our subscriptions..
                 foreach (var path in m_SubscriberMap)
                 {
-                    if (! m_TopicClient.IsSubscribed( path.Key + "blackboard", OnBlackBoardEvent ) )
-                        m_TopicClient.Subscribe( path.Key + "blackboard", OnBlackBoardEvent );
+                    if (! TopicClient.IsSubscribed( path.Key + "blackboard", OnBlackBoardEvent ) )
+                        TopicClient.Subscribe( path.Key + "blackboard", OnBlackBoardEvent );
 
                     Dictionary<string,List<Subscriber>> types = path.Value;
                     foreach( var kv in types )
@@ -230,7 +227,7 @@ namespace IBM.Watson.Self.Agents
                         subscribe["type"] = type;
                         subscribe["event_mask"] = (int)ThingEventType.TE_ALL;       // we want all events, we will filter those events on this side
 
-                        m_TopicClient.Publish( path.Key + "blackboard", Json.Serialize(subscribe));
+                        TopicClient.Publish( path.Key + "blackboard", Json.Serialize(subscribe));
                         Log.Status("BlackBoard", "Subscription to type {0} restored.", type );
                     }
                 }
@@ -332,7 +329,7 @@ namespace IBM.Watson.Self.Agents
                 json["failed_event"] = event_name;
                 json["event"] = "error";
 
-                m_TopicClient.Publish( a_Payload.Origin, Json.Serialize( json ) );
+                TopicClient.Publish( a_Payload.Origin, Json.Serialize( json ) );
             }
             else if ( te.m_EventType != ThingEventType.TE_NONE )
             {

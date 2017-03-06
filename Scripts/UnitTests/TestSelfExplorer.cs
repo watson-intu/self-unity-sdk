@@ -26,11 +26,13 @@ namespace IBM.Watson.Self.UnitTests
     public class TestSelfExplorer : UnitTest
     {
         bool m_bExplorerTested = false;
-        SelfExplorer m_Explorer = new SelfExplorer();
+        SelfExplorer m_Explorer = null;
 
         public override IEnumerator RunTest()
         {
-            TopicClient client = TopicClient.Instance;
+            TopicClient client = new TopicClient();
+            m_Explorer = new SelfExplorer(client);
+
             if ( client.IsActive )
             {
                 client.Disconnect();

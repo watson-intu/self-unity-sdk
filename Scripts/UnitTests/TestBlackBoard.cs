@@ -31,10 +31,13 @@ namespace IBM.Watson.Self.UnitTests
         bool m_ConnectionClosed = false;
 
         TopicClient m_Client = null;
+        BlackBoard m_BlackBoard = null;
 
         public override IEnumerator RunTest()
         {
-            m_Client = TopicClient.Instance;
+            m_Client = new TopicClient();
+            m_BlackBoard = new BlackBoard(m_Client);
+
             if ( m_Client.IsActive )
             {
                 m_Client.Disconnect();
@@ -80,7 +83,7 @@ namespace IBM.Watson.Self.UnitTests
         private void OnConnected()
         {
             Log.Debug( "TestBlackBoard", "OnConnected" );
-            BlackBoard.Instance.SubscribeToType( "Text", OnText, a_Path:m_TargetPath );
+            m_BlackBoard.SubscribeToType( "Text", OnText, a_Path:m_TargetPath );
             m_ConnectionClosed = false;
         }
 

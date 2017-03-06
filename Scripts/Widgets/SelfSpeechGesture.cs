@@ -22,6 +22,8 @@ using IBM.Watson.Self.Gestures;
 using System;
 using System.Collections;
 using UnityEngine;
+using IBM.Watson.Self.Topics;
+using IBM.Watson.DeveloperCloud.Utilities;
 
 namespace IBM.Watson.Self.Widgets
 {
@@ -33,6 +35,8 @@ namespace IBM.Watson.Self.Widgets
         [SerializeField]
         private Input m_SpeakingInput = new Input( "Speaking Input", typeof(SpeakingStateData), "OnSpeakingState" );
         [SerializeField]
+        private Input m_TopicClientInput = new Input("TopicClientInput", typeof(TopicClientData), "OnTopicClientInput");
+        [SerializeField]
         private string m_GestureId = "tts";
         [SerializeField]
         private bool m_Override = true;
@@ -40,13 +44,9 @@ namespace IBM.Watson.Self.Widgets
         private OnGestureDone m_Callback = null;
         #endregion
 
-        #region MonoBehavior interface
-        protected override void Start()
-        {
-            base.Start();
-            GestureManager.Instance.AddGesture(this, m_Override);
-        }
-         #endregion
+        #region Public Properties
+        public GestureManager GestureManager{ get; private set; }
+        #endregion
 
         #region Widget interface
         protected override string GetName()
@@ -106,6 +106,23 @@ namespace IBM.Watson.Self.Widgets
         }
         #endregion
 
+        #region Event Handlers
+        private void OnTopicClientInput(Data data)
+        {
+            TopicClientData a_TopicClientData = (TopicClientData)data;
+            if (a_TopicClientData == null || a_TopicClientData.TopicClient == null)
+            {
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            }
+            if (GestureManager != null)
+            {
+                GestureManager.RemoveGesture(this);
+            }
+
+            GestureManager = new GestureManager(a_TopicClientData.TopicClient);
+            GestureManager.AddGesture(this, m_Override);
+        }
+
         private void OnSpeakingState(Data data)
         {
             SpeakingStateData state = data as SpeakingStateData;
@@ -118,5 +135,8 @@ namespace IBM.Watson.Self.Widgets
                 }
             }
         }
+        #endregion
+
+
     }
 }

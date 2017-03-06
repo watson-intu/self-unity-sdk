@@ -169,7 +169,6 @@ namespace IBM.Watson.Self.Topics
         #endregion
 
         #region Public Interface
-        public static TopicClient Instance { get { return Singleton<TopicClient>.Instance; } }
         public bool IsActive { get { return m_eState != ClientState.Inactive && m_eState != ClientState.Disconnected; } }
         public ClientState State { get { return m_eState; } private set{ m_eState = value; lock (m_StateList) m_StateList.Add(value); } }
         public string SelfId { get { return m_SelfId; } }

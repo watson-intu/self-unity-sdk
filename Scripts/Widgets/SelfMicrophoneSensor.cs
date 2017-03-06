@@ -19,6 +19,9 @@ using System;
 using UnityEngine;
 using IBM.Watson.DeveloperCloud.Widgets;
 using IBM.Watson.Self.Sensors;
+using IBM.Watson.DeveloperCloud.DataTypes;
+using IBM.Watson.DeveloperCloud.Utilities;
+using IBM.Watson.DeveloperCloud.Logging;
 
 namespace IBM.Watson.Self.Widgets
 {
@@ -38,7 +41,13 @@ namespace IBM.Watson.Self.Widgets
         [SerializeField]
         protected Input m_AudioInput = new Input("Audio", typeof(DeveloperCloud.DataTypes.AudioData), "OnAudioInput");
         [SerializeField]
+        private Input m_TopicClientInput = new Input("TopicClientInput", typeof(TopicClientData), "OnTopicClientInput");
+        [SerializeField]
         protected bool m_bOverride = true;
+        #endregion
+
+        #region Public Properties
+        public SensorManager SensorManager{ get; private set; }
         #endregion
 
         #region Widget interface
@@ -100,8 +109,23 @@ namespace IBM.Watson.Self.Widgets
                     Add(audioData.Clip.frequency, audioData.Clip.channels);
 
                 if (IsStarted && !IsPaused)
-                    SensorManager.Instance.SendData( this, new Sensors.AudioData(audioData));
+                {
+                    if(SensorManager != null)
+                        SensorManager.SendData(this, new Sensors.AudioData(audioData));
+                    else
+                        Log.Error("SelfMicrophoneSensor", "SensorManager needs to be supported and can't be null.");
+                }
             }
+        }
+
+        private void OnTopicClientInput(Data data)
+        {
+            TopicClientData a_TopicClientData = (TopicClientData)data;
+            if (a_TopicClientData == null || a_TopicClientData.TopicClient == null)
+            {
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            }
+            SensorManager = new SensorManager(a_TopicClientData.TopicClient);
         }
         #endregion
 
@@ -117,13 +141,20 @@ namespace IBM.Watson.Self.Widgets
             m_Channels = a_Channels;
             m_IsAdded = true;
 
-            SensorManager.Instance.AddSensor(this, m_bOverride );
+            if(SensorManager != null)
+                SensorManager.AddSensor(this, m_bOverride );
+            else
+                Log.Error("SelfMicrophoneSensor", "SensorManager needs to be supported and can't be null.");
         }
         public void Remove()
         {
             if (m_IsAdded)
             {
-                SensorManager.Instance.RemoveSensor(this);
+                if(SensorManager != null)
+                    SensorManager.RemoveSensor(this);
+                else
+                    Log.Error("SelfMicrophoneSensor", "SensorManager needs to be supported and can't be null.");
+                
                 m_IsAdded = false;
             }
         }
