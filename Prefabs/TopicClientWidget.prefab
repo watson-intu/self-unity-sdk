@@ -52,7 +52,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AutoConnect: 1
-  m_Host: ws://127.0.0.1:9443
+  m_Host: 
   m_EmbodimentId: 
   m_Token: 
   m_ParentInstance: 

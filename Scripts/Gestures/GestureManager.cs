@@ -188,38 +188,45 @@ namespace IBM.Watson.Self.Gestures
             string event_name = json["event"] as string;
 
             IGesture gesture = null;
-            if ( m_Gestures.TryGetValue(gestureKey, out gesture ) )
+            if (m_Gestures.ContainsKey(gestureKey))
             {
-                if (event_name.CompareTo("execute_gesture") == 0)
+                if (m_Gestures.TryGetValue(gestureKey, out gesture))
                 {
-                    if (! gesture.Execute( OnGestureDone, json["params"] as IDictionary ) )
+                    if (event_name.CompareTo("execute_gesture") == 0)
                     {
-                        Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId );
-                        bFailed = true;
+                        if (!gesture.Execute(OnGestureDone, json["params"] as IDictionary))
+                        {
+                            Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId);
+                            bFailed = true;
+                        }
+                    }
+                    else if (event_name.CompareTo("abort_gesture") == 0)
+                    {
+                        if (!gesture.Abort())
+                        {
+                            Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
+                            bFailed = true;
+                        }
                     }
                 }
-                else if (event_name.CompareTo("abort_gesture") == 0)
+                else
                 {
-                    if (!gesture.Abort())
-                    {
-                        Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
-                        bFailed = true;
-                    }
+                    Log.Error("GestureManager", "Failed to find gesture {0}", gestureKey);
+                    bFailed = true;
+                }
+
+                // if we failed, send the message back with a different event
+                if (bFailed)
+                {
+                    json["failed_event"] = event_name;
+                    json["event"] = "error";
+
+                    TopicClient.Publish("gesture-manager", Json.Serialize(json));
                 }
             }
             else
             {
-                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureKey);
-                bFailed = true;
-            }
-
-            // if we failed, send the message back with a different event
-            if ( bFailed )
-            {
-                json["failed_event"] = event_name;
-                json["event"] = "error";
-
-                TopicClient.Publish( "gesture-manager", Json.Serialize( json ) );
+                //do nothing
             }
         }
         void OnGestureDone(IGesture a_Gesture, bool a_Error)
