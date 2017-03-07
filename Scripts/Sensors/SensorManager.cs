@@ -33,24 +33,30 @@ namespace IBM.Watson.Self.Sensors
     public class SensorManager
     {
         #region Private Data
+
         Dictionary<string, ISensor > m_Sensors = new Dictionary<string, ISensor>();
         Dictionary<string, bool> m_Overrides = new Dictionary<string, bool>();
         bool m_bDisconnected = false;
         #endregion
 
-        #region Public Interface
-        public static SensorManager Instance { get { return Singleton<SensorManager>.Instance; } }
+        #region Public Properties
+        public TopicClient TopicClient { get; protected set;}
+        #endregion
 
-        public SensorManager()
+        #region Public Interface
+        public SensorManager(TopicClient a_TopicClient)
         {
-            TopicClient.Instance.StateChangedEvent += OnStateChanged;
-            TopicClient.Instance.Subscribe( "sensor-manager", OnSensorManagerEvent );
+            if (a_TopicClient == null)
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            TopicClient = a_TopicClient;
+            TopicClient.StateChangedEvent += OnStateChanged;
+            TopicClient.Subscribe( "sensor-manager", OnSensorManagerEvent );
         }
 
         ~SensorManager()  
         {
-            TopicClient.Instance.StateChangedEvent -= OnStateChanged;
-            TopicClient.Instance.Unsubscribe( "sensor-manager", OnSensorManagerEvent );
+            TopicClient.StateChangedEvent -= OnStateChanged;
+            TopicClient.Unsubscribe( "sensor-manager", OnSensorManagerEvent );
         }
 
         public bool IsRegistered( ISensor a_Sensor )
@@ -76,7 +82,7 @@ namespace IBM.Watson.Self.Sensors
                 register["binary_type"] = a_Sensor.GetBinaryType();
                 register["override"] = a_bOverride;
 
-                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
+                TopicClient.Publish( "sensor-manager", Json.Serialize( register ) );
                 m_Sensors[ a_Sensor.GetSensorId() ] = a_Sensor;
                 m_Overrides[a_Sensor.GetSensorId()] = a_bOverride;
 
@@ -89,7 +95,7 @@ namespace IBM.Watson.Self.Sensors
             if (!IsRegistered(a_Sensor))
                 throw new WatsonException("SendData() invoked on unregisted sensors.");
 
-            TopicClient.Instance.Publish("sensor-proxy-" + a_Sensor.GetSensorId(), a_Data.ToBinary());
+            TopicClient.Publish("sensor-proxy-" + a_Sensor.GetSensorId(), a_Data.ToBinary());
         }
 
         //! Remove the provided sensor from the remote self instance.
@@ -104,7 +110,7 @@ namespace IBM.Watson.Self.Sensors
                 register["event"] = "remove_sensor_proxy";
                 register["sensorId"] = a_Sensor.GetSensorId();
 
-                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( register ) );
+                TopicClient.Publish( "sensor-manager", Json.Serialize( register ) );
                 Log.Status( "SensorManager", "Sensor {0} removed.", a_Sensor.GetSensorId() );
             }
         }
@@ -145,7 +151,7 @@ namespace IBM.Watson.Self.Sensors
                     register["binary_type"] = sensor.GetBinaryType();
                     register["override"] = m_Overrides[sensorId];
 
-                    TopicClient.Instance.Publish("sensor-manager", Json.Serialize(register));
+                    TopicClient.Publish("sensor-manager", Json.Serialize(register));
                     Log.Status("SensorManager", "Sensor {0} restored.", sensor.GetSensorId());
                 }
                 m_bDisconnected = false;
@@ -201,7 +207,7 @@ namespace IBM.Watson.Self.Sensors
                 json["failed_event"] = json["event"];
                 json["event"] = "error";
 
-                TopicClient.Instance.Publish( "sensor-manager", Json.Serialize( json ) );
+                TopicClient.Publish( "sensor-manager", Json.Serialize( json ) );
             }
         }
         #endregion

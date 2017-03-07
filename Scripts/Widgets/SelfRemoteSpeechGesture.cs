@@ -38,15 +38,25 @@ namespace IBM.Watson.Self.Widgets
 		private Output m_Status = new Output( typeof(StatusData), true );
 		[SerializeField]
 		private Output m_DisableMic = new Output(typeof(DisableMicData));
+        [SerializeField]
+        private Input m_TopicClientInput = new Input("TopicClientInput", typeof(TopicClientData), "OnTopicClientInput");
 		#endregion
 
+        #region Public Properties
+        public TopicClient TopicClient { get; private set;}
+        #endregion
+
 		#region MonoBehavior interface
-		protected override void Start()
-		{
-			base.Start();
-			TopicClient.Instance.StateChangedEvent += OnStateChanged;
-			TopicClient.Instance.Subscribe( "audio-out", OnAudioEvent );
-		}
+
+        public void OnDestroy()
+        {
+            if (TopicClient != null)
+            {
+                TopicClient.StateChangedEvent -= OnStateChanged;
+                TopicClient.Unsubscribe("audio-out", OnAudioEvent);
+            }
+        }
+
 		#endregion
 
 		#region Widget interface
@@ -55,6 +65,26 @@ namespace IBM.Watson.Self.Widgets
 			return "SelfRemoteSpeechGesture";
 		}
 		#endregion
+
+        #region Event Handlers
+        private void OnTopicClientInput(Data data)
+        {
+            TopicClientData a_TopicClientData = (TopicClientData)data;
+            if (a_TopicClientData == null || a_TopicClientData.TopicClient == null)
+            {
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            }
+            if (TopicClient != null)
+            {
+                TopicClient.StateChangedEvent -= OnStateChanged;
+                TopicClient.Unsubscribe( "audio-out", OnAudioEvent );
+            }
+
+            TopicClient = a_TopicClientData.TopicClient;
+            TopicClient.StateChangedEvent += OnStateChanged;
+            TopicClient.Subscribe("audio-out", OnAudioEvent);
+        }
+        #endregion
 
 		#region Callback Functions
 

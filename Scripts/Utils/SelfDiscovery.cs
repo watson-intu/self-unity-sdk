@@ -36,6 +36,7 @@ namespace IBM.Watson.Self.Utils
         #region Private Data
         private string m_MulticastAddress = "239.255.0.1";
         private int m_Port = 9444;
+        private int m_DefaultListeningPort = 9443;
         private Thread m_ReceiveThread = null;
         private List<SelfInstance> m_Discovered = new List<SelfInstance>();
         private int m_IPMulticastTimeToLive = 5;
@@ -195,7 +196,24 @@ namespace IBM.Watson.Self.Utils
                             instance.InstanceId = json["instanceId"] as string;
                             instance.GroupId = json["groupId"] as string;
                             instance.OrgId = json["orgId"] as string;
-                            instance.Port = (int) json["port"];
+                            if (json.Contains("port"))
+                            {
+                                int portNumber = 0;
+                                if (int.TryParse(json["port"].ToString(), out portNumber) && portNumber != 0)
+                                {
+                                    instance.Port = portNumber;
+                                }
+                                else
+                                {
+                                    Log.Error("SelfDiscovery", "Port value couldn't be cast {0} Using default port {1}", json["port"].ToString(), m_DefaultListeningPort);
+                                    instance.Port = m_DefaultListeningPort;
+                                }
+                            }
+                            else
+                            {
+                                Log.Error("SelfDiscovery", "Port needs to supported to be connect. Using default port {0}", m_DefaultListeningPort);
+                                instance.Port = m_DefaultListeningPort;
+                            }
 
                             instance.LastPing = DateTime.Now;
 

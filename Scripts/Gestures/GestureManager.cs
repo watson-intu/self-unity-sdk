@@ -36,18 +36,24 @@ namespace IBM.Watson.Self.Gestures
         #endregion
 
         #region Public Interface
+
         /// <summary>
-        /// Get the GestureManager singleton object.
+        /// Gets the topic client.
         /// </summary>
-        public static GestureManager Instance { get { return Singleton<GestureManager>.Instance; } }
+        /// <value>The topic client.</value>
+        public TopicClient TopicClient{ get; private set; }
 
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public GestureManager()
+        public GestureManager(TopicClient a_TopicClient)
         {
-            TopicClient.Instance.StateChangedEvent += OnStateChanged;
-            TopicClient.Instance.Subscribe( "gesture-manager", OnGestureManagerEvent );
+            if (a_TopicClient == null)
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            
+            TopicClient = a_TopicClient;
+            TopicClient.StateChangedEvent += OnStateChanged;
+            TopicClient.Subscribe( "gesture-manager", OnGestureManagerEvent );
         }
 
         /// <summary>
@@ -56,8 +62,8 @@ namespace IBM.Watson.Self.Gestures
         /// </summary>
         ~GestureManager()  
         {
-            TopicClient.Instance.StateChangedEvent -= OnStateChanged;
-            TopicClient.Instance.Unsubscribe( "gesture-manager", OnGestureManagerEvent );
+            TopicClient.StateChangedEvent -= OnStateChanged;
+            TopicClient.Unsubscribe( "gesture-manager", OnGestureManagerEvent );
         }
 
         /// <summary>
@@ -90,7 +96,7 @@ namespace IBM.Watson.Self.Gestures
                     register["instanceId"] = a_Gesture.GetInstanceId();
                     register["override"] = a_bOverride;
 
-                    TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
+                    TopicClient.Publish( "gesture-manager", Json.Serialize( register ) );
                     m_Gestures[gestureKey] = a_Gesture;
                     m_Overrides[gestureKey] = a_bOverride;
 
@@ -118,7 +124,7 @@ namespace IBM.Watson.Self.Gestures
                     register["gestureId"] = a_Gesture.GetGestureId();
                     register["instanceId"] = a_Gesture.GetInstanceId();
 
-                    TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( register ) );
+                    TopicClient.Publish( "gesture-manager", Json.Serialize( register ) );
                     Log.Status( "GestureManager", "Gesture {0} removed.", gestureKey );
                 }
             }
@@ -159,7 +165,7 @@ namespace IBM.Watson.Self.Gestures
                     register["instanceId"] = gesture.GetInstanceId();
                     register["override"] = m_Overrides[gestureKey];
 
-                    TopicClient.Instance.Publish("gesture-manager", Json.Serialize(register));
+                    TopicClient.Publish("gesture-manager", Json.Serialize(register));
                     Log.Status("GestureManager", "Gesture {0} restored.", gestureKey);
                 }
                 m_bDisconnected = false;
@@ -182,38 +188,45 @@ namespace IBM.Watson.Self.Gestures
             string event_name = json["event"] as string;
 
             IGesture gesture = null;
-            if ( m_Gestures.TryGetValue(gestureKey, out gesture ) )
+            if (m_Gestures.ContainsKey(gestureKey))
             {
-                if (event_name.CompareTo("execute_gesture") == 0)
+                if (m_Gestures.TryGetValue(gestureKey, out gesture))
                 {
-                    if (! gesture.Execute( OnGestureDone, json["params"] as IDictionary ) )
+                    if (event_name.CompareTo("execute_gesture") == 0)
                     {
-                        Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId );
-                        bFailed = true;
+                        if (!gesture.Execute(OnGestureDone, json["params"] as IDictionary))
+                        {
+                            Log.Error("GestureManager", "Failed to execute gesture {0}", gestureId);
+                            bFailed = true;
+                        }
+                    }
+                    else if (event_name.CompareTo("abort_gesture") == 0)
+                    {
+                        if (!gesture.Abort())
+                        {
+                            Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
+                            bFailed = true;
+                        }
                     }
                 }
-                else if (event_name.CompareTo("abort_gesture") == 0)
+                else
                 {
-                    if (!gesture.Abort())
-                    {
-                        Log.Error("GestureManager", "Failed to abort gesture {0}", gestureId);
-                        bFailed = true;
-                    }
+                    Log.Error("GestureManager", "Failed to find gesture {0}", gestureKey);
+                    bFailed = true;
+                }
+
+                // if we failed, send the message back with a different event
+                if (bFailed)
+                {
+                    json["failed_event"] = event_name;
+                    json["event"] = "error";
+
+                    TopicClient.Publish("gesture-manager", Json.Serialize(json));
                 }
             }
             else
             {
-                Log.Error( "GestureManager", "Failed to find gesture {0}", gestureKey);
-                bFailed = true;
-            }
-
-            // if we failed, send the message back with a different event
-            if ( bFailed )
-            {
-                json["failed_event"] = event_name;
-                json["event"] = "error";
-
-                TopicClient.Instance.Publish( "gesture-manager", Json.Serialize( json ) );
+                //do nothing
             }
         }
         void OnGestureDone(IGesture a_Gesture, bool a_Error)
@@ -224,7 +237,7 @@ namespace IBM.Watson.Self.Gestures
             response["instanceId"] = a_Gesture.GetInstanceId();
             response["error"] = a_Error;
 
-            TopicClient.Instance.Publish("gesture-manager", Json.Serialize(response));
+            TopicClient.Publish("gesture-manager", Json.Serialize(response));
         }
 
         #endregion

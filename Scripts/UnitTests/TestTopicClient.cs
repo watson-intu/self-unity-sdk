@@ -29,20 +29,21 @@ namespace IBM.Watson.Self.UnitTests
         bool m_bSubFailedTested = false;
         bool m_bSubscribeBinaryTested = false;
         bool m_bSubscribeTextTested = false;
+        TopicClient m_TopicClient = null;
 
         public override IEnumerator RunTest()
         {
-            TopicClient client = TopicClient.Instance;
-            if ( client.IsActive )
+            m_TopicClient = new TopicClient();
+            if ( m_TopicClient.IsActive )
             {
-                client.Disconnect();
-                while( client.IsActive ) 
+                m_TopicClient.Disconnect();
+                while( m_TopicClient.IsActive ) 
                     yield return null;
             }
 
-            client.StateChangedEvent += OnStateChanged;
+            m_TopicClient.StateChangedEvent += OnStateChanged;
 
-            client.Connect();
+            m_TopicClient.Connect();
             while(! m_bQueryTested )
                 yield return null;
             while(! m_bSubscribeBinaryTested )
@@ -52,7 +53,7 @@ namespace IBM.Watson.Self.UnitTests
             while(! m_bSubFailedTested )
                 yield return null;
 
-            client.StateChangedEvent -= OnStateChanged;
+            m_TopicClient.StateChangedEvent -= OnStateChanged;
 
             yield break;
         }
@@ -77,7 +78,7 @@ namespace IBM.Watson.Self.UnitTests
         private void OnConnected()
         {
             Log.Debug( "TestTopicClient", "OnConnected" );
-            TopicClient.Instance.Query( ".", OnQuery );
+            m_TopicClient.Query( ".", OnQuery );
         }
 
         private void OnDisconnected()
@@ -90,24 +91,24 @@ namespace IBM.Watson.Self.UnitTests
             Log.Debug( "TopicClient", "OnQuery(). QueryResponse: {0}", a_Query );
             m_bQueryTested = true;
 
-            TopicClient.Instance.Subscribe( "sensor-Microphone", OnMicrophoneData );
+            m_TopicClient.Subscribe( "sensor-Microphone", OnMicrophoneData );
         }
 
         private void OnMicrophoneData( TopicClient.Payload a_Payload )
         {
             Log.Debug( "TopicClient", "OnMicrophoneData() received. Payload: {0}", a_Payload );
-            Test( TopicClient.Instance.Unsubscribe( "sensor-Microphone", OnMicrophoneData ) );
+            Test( m_TopicClient.Unsubscribe( "sensor-Microphone", OnMicrophoneData ) );
             m_bSubscribeBinaryTested = true;
 
-            TopicClient.Instance.Subscribe( "blackboard", OnBlackboard );
-            TopicClient.Instance.Subscribe( "invalid-topic", OnInvalidTopic );
-            TopicClient.Instance.Publish( "conversation", "tell me a joke" );
+            m_TopicClient.Subscribe( "blackboard", OnBlackboard );
+            m_TopicClient.Subscribe( "invalid-topic", OnInvalidTopic );
+            m_TopicClient.Publish( "conversation", "tell me a joke" );
         }
 
         private void OnBlackboard( TopicClient.Payload a_Payload )
         {
             Log.Debug( "TopicClient", "OnBlackboard(). Payload: {0} \n Data: {1}", a_Payload, Encoding.UTF8.GetString( a_Payload.Data ) );
-            Test( TopicClient.Instance.Unsubscribe( "blackboard", OnBlackboard ) );
+            Test( m_TopicClient.Unsubscribe( "blackboard", OnBlackboard ) );
             m_bSubscribeTextTested = true;
         }
 

@@ -58,6 +58,7 @@ namespace IBM.Watson.Self.Utils
             public TopicClient.QueryInfo Info { get { return m_Info; } }
             public string SelfId { get { return m_Info != null ? m_Info.SelfId : ""; } }
             public string ParentId { get { return m_Info != null ? m_Info.ParentId : ""; } }
+            public TopicClient TopicClient { get; set;}
             #endregion
 
             /// <summary>
@@ -71,7 +72,7 @@ namespace IBM.Watson.Self.Utils
                 m_bError = false;
 
                 m_Explorer.m_PendingRequests += 1;
-                TopicClient.Instance.Query( m_Path, OnQueryResponse );
+                TopicClient.Query( m_Path, OnQueryResponse );
             }
 
             public void Stop()
@@ -80,7 +81,7 @@ namespace IBM.Watson.Self.Utils
 
                 if ( m_bSubscribed )
                 {
-                    TopicClient.Instance.Unsubscribe( m_Path + "topic-manager", OnTopicManagerEvent );
+                    TopicClient.Unsubscribe( m_Path + "topic-manager", OnTopicManagerEvent );
                     m_bSubscribed = false;
                 }
                 if ( m_RetryRoutine >= 0 )
@@ -93,6 +94,7 @@ namespace IBM.Watson.Self.Utils
             public Node( SelfExplorer a_Explorer )
             {
                 m_Explorer = a_Explorer;
+                TopicClient = a_Explorer.TopicClient;
             }
 
             private bool IsCircular( string a_Id )
@@ -174,7 +176,7 @@ namespace IBM.Watson.Self.Utils
 
                 if ( m_Info != null )
                 {
-                    TopicClient.Instance.Subscribe( m_Path + "topic-manager", OnTopicManagerEvent );
+                    TopicClient.Subscribe( m_Path + "topic-manager", OnTopicManagerEvent );
                     m_bSubscribed = true;
 
                     if (! string.IsNullOrEmpty( m_Info.ParentId ) )
@@ -309,6 +311,16 @@ namespace IBM.Watson.Self.Utils
         public OnNode OnNodeRemoved { get; set; }
         public OnDone OnExplorerDone { get; set; }
         public OnDone OnExplorerRefresh { get; set; }
+        public TopicClient TopicClient {get; private set;}
+        #endregion
+
+        #region Constuction & Destruction
+        public SelfExplorer(TopicClient a_TopicClient)
+        {
+            if (a_TopicClient == null)
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            TopicClient = a_TopicClient;
+        }
         #endregion
 
         #region Public Functions
@@ -318,7 +330,7 @@ namespace IBM.Watson.Self.Utils
                 Root.Stop();
 
             Root = new Node(this);
-            Root.Refresh( a_StartTarget, TopicClient.Instance.SelfId );
+            Root.Refresh( a_StartTarget, TopicClient.SelfId );
         }
 
         public void Stop()

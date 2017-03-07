@@ -20,6 +20,8 @@ using IBM.Watson.Self.Gestures;
 using System;
 using System.Collections;
 using UnityEngine;
+using IBM.Watson.DeveloperCloud.Utilities;
+using IBM.Watson.Self.Topics;
 
 namespace IBM.Watson.Self.Widgets
 {
@@ -32,15 +34,13 @@ namespace IBM.Watson.Self.Widgets
         private bool m_Override = true;
 		[SerializeField]
 		private Output m_Status = new Output( typeof(StatusData), true );
+        [SerializeField]
+        private Input m_TopicClientInput = new Input("TopicClientInput", typeof(TopicClientData), "OnTopicClientInput");
         private string m_InstanceId = Guid.NewGuid().ToString();
         #endregion
 
-        #region MonoBehavior interface
-        protected override void Start()
-        {
-            base.Start();
-            GestureManager.Instance.AddGesture(this, m_Override);
-        }
+        #region Public Properties
+        public GestureManager GestureManager{ get; private set; }
         #endregion
 
         #region Widget interface
@@ -89,5 +89,19 @@ namespace IBM.Watson.Self.Widgets
             return true;
         }
         #endregion
+
+        #region Input Handlers
+        private void OnTopicClientInput(Data data)
+        {
+            TopicClientData a_TopicClientData = (TopicClientData)data;
+            if (a_TopicClientData == null || a_TopicClientData.TopicClient == null)
+            {
+                throw new WatsonException("TopicClient needs to be supported and can't be null.");
+            }
+            GestureManager = new GestureManager(a_TopicClientData.TopicClient);
+            GestureManager.AddGesture(this, m_Override);
+        }
+        #endregion
+
     }
 }
