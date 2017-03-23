@@ -94,13 +94,15 @@ namespace IBM.Watson.Self.Utils
             Log.Debug("SelfDiscovery", "Discovery started with multicast address: {0} and port {1}", m_MulticastAddress, m_Port);
             m_Discovered.Clear();
             m_NumberOfInstances = 0;
+            bool successOnSocketBind = false;
 
             if (m_UdpClient == null)
             {
                 IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
                 m_UdpClient = new UdpClient();
                 m_UdpClient.ExclusiveAddressUse = true;
-                
+               
+                //TODO: Fix it to make it ultimate 
                 try
                 {
                     m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
@@ -116,28 +118,43 @@ namespace IBM.Watson.Self.Utils
                     m_UdpClient.Client.Bind(new IPEndPoint(IPAddress.Any, m_Port));
                     m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr, IPAddress.Any));
                     m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, m_IPMulticastTimeToLive);
+                    successOnSocketBind = true;
                 }
                 catch (Exception e)
                 {
                     Log.Error("SelfDiscovery", "Exception UDP client setting. Message: {0}, StackTrace: {1}", e.Message, e.StackTrace);
                 }
-                
-                if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
-                    m_ReceiveThread.Abort();
 
-                m_ReceiveThread = new Thread( () => ReceiveThread() );
-                m_ReceiveThread.IsBackground = true;
-                m_ReceiveThread.Start();
+                if (successOnSocketBind)
+                {
+                    if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
+                        m_ReceiveThread.Abort();
 
-                m_AsyncDiscoveredID = Runnable.Run(AsyncOnDiscovered());
+                    m_ReceiveThread = new Thread(() => ReceiveThread());
+                    m_ReceiveThread.IsBackground = true;
+                    m_ReceiveThread.Start();
+
+                    m_AsyncDiscoveredID = Runnable.Run(AsyncOnDiscovered());
+                }
+            }
+            else
+            {
+                successOnSocketBind = true;
             }
 
-            Log.Debug("SelfDiscovery", "Broadcasting Ping");
-            Dictionary<string,object> message = new Dictionary<string, object>();
-            message["action"] = "ping";
-            byte [] packet = Encoding.UTF8.GetBytes( Json.Serialize( message ) );
-            m_UdpClient.EnableBroadcast = true;
-            m_UdpClient.Send(packet, packet.Length, new IPEndPoint(IPAddress.Broadcast, m_Port));
+            if (successOnSocketBind)
+            {
+                Log.Debug("SelfDiscovery", "Broadcasting Ping");
+                Dictionary<string, object> message = new Dictionary<string, object>();
+                message["action"] = "ping";
+                byte[] packet = Encoding.UTF8.GetBytes(Json.Serialize(message));
+                m_UdpClient.EnableBroadcast = true;
+                m_UdpClient.Send(packet, packet.Length, new IPEndPoint(IPAddress.Broadcast, m_Port));
+            }
+            else
+            {
+                StopDiscovery();
+            }
 
         }
 
