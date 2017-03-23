@@ -100,11 +100,28 @@ namespace IBM.Watson.Self.Utils
                 IPAddress multicastAddr = IPAddress.Parse( m_MulticastAddress );
                 m_UdpClient = new UdpClient();
                 m_UdpClient.ExclusiveAddressUse = true;
-                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket,SocketOptionName.Broadcast, true );
-                m_UdpClient.Client.Bind( new IPEndPoint( IPAddress.Any, m_Port) );
-                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr,IPAddress.Any));
-                m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, m_IPMulticastTimeToLive);
+                
+                try
+                {
+                    m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("SelfDiscovery", "Exception UDP client settint reuse address. Message: {0}, StackTrace: {1}", e.Message, e.StackTrace);
+                }
 
+                try
+                {
+                    m_UdpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, true);
+                    m_UdpClient.Client.Bind(new IPEndPoint(IPAddress.Any, m_Port));
+                    m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(multicastAddr, IPAddress.Any));
+                    m_UdpClient.Client.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, m_IPMulticastTimeToLive);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("SelfDiscovery", "Exception UDP client setting. Message: {0}, StackTrace: {1}", e.Message, e.StackTrace);
+                }
+                
                 if (m_ReceiveThread != null && m_ReceiveThread.IsAlive)
                     m_ReceiveThread.Abort();
 
